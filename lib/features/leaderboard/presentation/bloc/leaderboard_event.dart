@@ -8,6 +8,8 @@ abstract class LeaderboardEvent extends Equatable {
   List<Object?> get props => [];
 }
 
+class LoadLeaderboardEvent extends LeaderboardEvent {}
+
 class ChangeLeaderboardTypeEvent extends LeaderboardEvent {
   final LeaderboardType type;
 

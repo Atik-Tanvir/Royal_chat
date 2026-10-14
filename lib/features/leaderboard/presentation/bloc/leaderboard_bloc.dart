@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/config/supabase_config.dart';
 import '../../domain/entities/leaderboard_entry.dart';
 import 'leaderboard_event.dart';
 import 'leaderboard_state.dart';
@@ -15,36 +17,83 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
             myBalance: '161.48K',
           ),
         ) {
+    on<LoadLeaderboardEvent>(_onLoadLeaderboard);
     on<ChangeLeaderboardTypeEvent>(_onChangeType);
     on<ChangeLeaderboardTimeframeEvent>(_onChangeTimeframe);
     on<ToggleAnonymousEvent>(_onToggleAnonymous);
+
+    // Initial async dynamic load
+    add(LoadLeaderboardEvent());
   }
 
-  void _onChangeType(ChangeLeaderboardTypeEvent event, Emitter<LeaderboardState> emit) {
-    List<LeaderboardEntry> newEntries;
-    switch (event.type) {
-      case LeaderboardType.wealth:
-        newEntries = _getWealthEntries();
-        break;
-      case LeaderboardType.game:
-        newEntries = _getGameEntries();
-        break;
-      case LeaderboardType.charm:
-        newEntries = _getCharmEntries();
-        break;
-      case LeaderboardType.invitation:
-        newEntries = _getInvitationEntries();
-        break;
+  Future<void> _onLoadLeaderboard(LoadLeaderboardEvent event, Emitter<LeaderboardState> emit) async {
+    final dynamicEntries = await _fetchDynamicEntries(state.currentType, state.currentTimeframe);
+    emit(state.copyWith(entries: dynamicEntries));
+  }
+
+  Future<void> _onChangeType(ChangeLeaderboardTypeEvent event, Emitter<LeaderboardState> emit) async {
+    emit(state.copyWith(currentType: event.type));
+    final dynamicEntries = await _fetchDynamicEntries(event.type, state.currentTimeframe);
+    emit(state.copyWith(entries: dynamicEntries));
+  }
+
+  Future<void> _onChangeTimeframe(ChangeLeaderboardTimeframeEvent event, Emitter<LeaderboardState> emit) async {
+    emit(state.copyWith(currentTimeframe: event.timeframe));
+    final dynamicEntries = await _fetchDynamicEntries(state.currentType, event.timeframe);
+    emit(state.copyWith(entries: dynamicEntries));
+  }
+
+  Future<List<LeaderboardEntry>> _fetchDynamicEntries(LeaderboardType type, LeaderboardTimeframe timeframe) async {
+    try {
+      final typeStr = type.name;
+      final response = await SupabaseConfig.client
+          .from('leaderboards')
+          .select()
+          .eq('type', typeStr)
+          .order('rank', ascending: true);
+      if (response.isNotEmpty) {
+        return (response as List).map((row) {
+          final score = (row['score'] as num?)?.toDouble() ?? 1000000.0;
+          String formatted;
+          if (score >= 1000000) {
+            formatted = '${(score / 1000000).toStringAsFixed(2)}M';
+          } else if (score >= 1000) {
+            formatted = '${(score / 1000).toStringAsFixed(1)}K';
+          } else {
+            formatted = score.toStringAsFixed(0);
+          }
+
+          return LeaderboardEntry(
+            rank: (row['rank'] as num?)?.toInt() ?? 1,
+            username: row['user_name'] as String? ?? 'User',
+            flagEmoji: row['country_flag'] as String? ?? '🇧🇩',
+            gender: '♂',
+            age: 21,
+            level: 6,
+            levelType: 'LV',
+            amount: score,
+            amountFormatted: formatted,
+            isGems: type == LeaderboardType.charm,
+            usdEquivalent: score * 0.0001,
+            avatarUrl: (row['user_avatar'] as String?)?.isNotEmpty == true ? row['user_avatar'] as String : null,
+            isVip: true,
+          );
+        }).toList();
+      }
+    } catch (e) {
+      debugPrint('LeaderboardBloc: Supabase fetch error, fallback to mock: $e');
     }
 
-    emit(state.copyWith(
-      currentType: event.type,
-      entries: newEntries,
-    ));
-  }
-
-  void _onChangeTimeframe(ChangeLeaderboardTimeframeEvent event, Emitter<LeaderboardState> emit) {
-    emit(state.copyWith(currentTimeframe: event.timeframe));
+    switch (type) {
+      case LeaderboardType.wealth:
+        return _getWealthEntries();
+      case LeaderboardType.game:
+        return _getGameEntries();
+      case LeaderboardType.charm:
+        return _getCharmEntries();
+      case LeaderboardType.invitation:
+        return _getInvitationEntries();
+    }
   }
 
   void _onToggleAnonymous(ToggleAnonymousEvent event, Emitter<LeaderboardState> emit) {

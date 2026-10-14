@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
+import '../../../../core/config/supabase_config.dart';
 import '../../domain/entities/party_room.dart';
 import '../../domain/repositories/party_repository.dart';
 
 class PartyRepositoryImpl implements PartyRepository {
-  final List<PartyRoom> _rooms = [
+  final List<PartyRoom> _fallbackRooms = [
     // Lucky Number rooms
     const PartyRoom(
       id: 'room_101',
@@ -20,7 +22,7 @@ class PartyRepositoryImpl implements PartyRepository {
     ),
     const PartyRoom(
       id: 'room_102',
-      title: '💖 ANG...',
+      title: '💖 ANG... Lounge',
       hostName: '💖 ANG...',
       hostAvatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
       countryFlag: '🇧🇩',
@@ -99,43 +101,89 @@ class PartyRepositoryImpl implements PartyRepository {
         'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100',
       ],
     ),
-    const PartyRoom(
-      id: 'room_302',
-      title: 'Royal Crown Chill',
-      hostName: 'Queen_K',
-      hostAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-      countryFlag: '🇲🇾',
-      onlineCount: 13,
-      category: 'Chatroom',
-      seatedAvatars: [
-        'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100',
-      ],
-    ),
   ];
 
   @override
   Future<List<PartyRoom>> getPartyRooms({String? category, String? country}) async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    if (category != null && category != 'All') {
-      return _rooms.where((r) => r.category == category).toList();
+    try {
+      var query = SupabaseConfig.client.from('rooms').select();
+      if (category != null && category.isNotEmpty && category != 'All') {
+        query = query.eq('category', category);
+      }
+      if (country != null && country.isNotEmpty && country != 'All') {
+        query = query.eq('country', country);
+      }
+      final response = await query.order('created_at', ascending: false);
+      if (response.isNotEmpty) {
+        return (response as List).map((row) {
+          final seatedAvatarsRaw = row['seated_avatars'];
+          List<String> seated = [];
+          if (seatedAvatarsRaw is List) {
+            seated = seatedAvatarsRaw.map((e) => e.toString()).toList();
+          } else {
+            seated = const [
+              'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
+              'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
+            ];
+          }
+
+          return PartyRoom(
+            id: row['id'] as String,
+            title: row['title'] as String? ?? 'Live Party',
+            hostName: row['host_name'] as String? ?? 'Host',
+            hostAvatar: (row['host_avatar'] as String?)?.isNotEmpty == true
+                ? row['host_avatar'] as String
+                : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+            countryFlag: row['country_flag'] as String? ?? '🇧🇩',
+            onlineCount: (row['online_count'] as num?)?.toInt() ?? 1,
+            category: row['category'] as String? ?? 'Lucky Number',
+            seatedAvatars: seated,
+            isLive: row['status'] == 'live',
+          );
+        }).toList();
+      }
+    } catch (e) {
+      debugPrint('PartyRepository: Supabase fetch error, using fallback: $e');
     }
-    return _rooms;
+
+    if (category != null && category != 'All') {
+      return _fallbackRooms.where((r) => r.category == category).toList();
+    }
+    return _fallbackRooms;
   }
 
   @override
   Future<PartyRoom> createRoom({required String title, required String category}) async {
+    final newId = 'room_${DateTime.now().millisecondsSinceEpoch}';
     final newRoom = PartyRoom(
-      id: 'room_${DateTime.now().millisecondsSinceEpoch}',
+      id: newId,
       title: title,
       hostName: 'User30961573',
-      hostAvatar: '',
+      hostAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
       countryFlag: '🇧🇩',
       onlineCount: 1,
       category: category,
       seatedAvatars: const [],
       isLive: true,
     );
-    _rooms.insert(0, newRoom);
+
+    try {
+      await SupabaseConfig.client.from('rooms').insert({
+        'id': newRoom.id,
+        'title': newRoom.title,
+        'host_name': newRoom.hostName,
+        'host_avatar': newRoom.hostAvatar,
+        'category': newRoom.category,
+        'country': 'Bangladesh',
+        'country_flag': newRoom.countryFlag,
+        'online_count': newRoom.onlineCount,
+        'status': 'live',
+      });
+    } catch (e) {
+      debugPrint('PartyRepository: Supabase insert error: $e');
+    }
+
+    _fallbackRooms.insert(0, newRoom);
     return newRoom;
   }
 }

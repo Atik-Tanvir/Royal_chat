@@ -7,6 +7,8 @@ abstract class MomentsEvent extends Equatable {
   List<Object?> get props => [];
 }
 
+class LoadMomentsEvent extends MomentsEvent {}
+
 class ChangeMomentTabEvent extends MomentsEvent {
   final String tab; // 'Follow', 'Moments', 'Video'
 
