@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app/app.dart';
+import 'core/config/supabase_config.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Supabase Backend
+  await SupabaseConfig.initialize();
 
   // Set system UI overlay style matching dark green gaming party theme
   SystemChrome.setSystemUIOverlayStyle(
