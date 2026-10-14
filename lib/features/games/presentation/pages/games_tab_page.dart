@@ -293,35 +293,36 @@ class _GamesTabPageState extends State<GamesTabPage> with SingleTickerProviderSt
   }
 
   Widget _buildGameGrid(BuildContext context, BlockMeState state) {
-    const double boardPadding = 12.0;
-    final screenWidth = MediaQuery.of(context).size.width - 32;
-    final gridWidth = screenWidth - (boardPadding * 2);
-    final cellSize = gridWidth / 8.0;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const double boardPadding = 8.0;
+        const double borderWidth = 3.0;
+        final availableWidth = constraints.maxWidth - (boardPadding * 2) - (borderWidth * 2);
+        final cellSize = (availableWidth / 8.0);
 
-    return Container(
-      padding: const EdgeInsets.all(boardPadding),
-      decoration: BoxDecoration(
-        color: const Color(0xFF07382B),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFF139671),
-          width: 3,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.4),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+        return Container(
+          padding: const EdgeInsets.all(boardPadding),
+          decoration: BoxDecoration(
+            color: const Color(0xFF07382B),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: const Color(0xFF139671),
+              width: borderWidth,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.4),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // 8x8 Grid
-          Column(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: List.generate(8, (r) {
               return Row(
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: List.generate(8, (c) {
                   final block = state.grid[r][c];
                   return GestureDetector(
@@ -348,8 +349,8 @@ class _GamesTabPageState extends State<GamesTabPage> with SingleTickerProviderSt
               );
             }),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
