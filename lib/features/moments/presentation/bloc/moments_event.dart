@@ -26,6 +26,16 @@ class AddMomentPostEvent extends MomentsEvent {
   List<Object?> get props => [content, images];
 }
 
+class CreateMomentEvent extends MomentsEvent {
+  final String content;
+  final List<String> imageUrls;
+
+  const CreateMomentEvent({required this.content, this.imageUrls = const []});
+
+  @override
+  List<Object?> get props => [content, imageUrls];
+}
+
 class ToggleLikePostEvent extends MomentsEvent {
   final String postId;
 

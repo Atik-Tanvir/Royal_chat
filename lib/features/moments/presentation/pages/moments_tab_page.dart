@@ -4,10 +4,12 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/widgets/cat_mascot_widget.dart';
 import '../../../../core/widgets/gemgala_background.dart';
+import '../../../../core/widgets/custom_avatar.dart';
 import '../bloc/moments_bloc.dart';
 import '../bloc/moments_event.dart';
 import '../bloc/moments_state.dart';
-import '../widgets/create_moment_sheet.dart';
+import '../../domain/entities/moment_post.dart';
+import 'create_moment_page.dart';
 
 class MomentsTabPage extends StatelessWidget {
   const MomentsTabPage({super.key});
@@ -38,8 +40,10 @@ class MomentsTabPage extends StatelessWidget {
               Expanded(
                 child: BlocBuilder<MomentsBloc, MomentsState>(
                   builder: (context, state) {
-                    if (state.posts.isEmpty) {
-                      // Matching Screenshot 3: Empty state with Cat Mascot
+                    final bool showEmpty = state.activeTab != 'Moments' || state.posts.isEmpty;
+
+                    if (showEmpty) {
+                      // Matching Screenshot 2: Empty state with Cat Mascot
                       return Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -54,99 +58,20 @@ class MomentsTabPage extends StatelessWidget {
                                 letterSpacing: 0.5,
                               ),
                             ),
-                            const SizedBox(height: 60), // Optical center balance
+                            const SizedBox(height: 60),
                           ],
                         ),
                       );
                     }
 
-                    // Posts list
+                    // Rich Moments Feed (Matching Screenshot 5)
                     return ListView.separated(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
                       itemCount: state.posts.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      separatorBuilder: (_, __) => const SizedBox(height: 14),
                       itemBuilder: (context, i) {
                         final post = state.posts[i];
-                        return Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Colors.black26,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.white10),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 18,
-                                    backgroundColor: AppColors.primaryGreen,
-                                    child: Text(post.countryFlag),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        post.authorName,
-                                        style: AppTextStyles.titleMedium.copyWith(color: Colors.white),
-                                      ),
-                                      Text(
-                                        'Just now',
-                                        style: AppTextStyles.caption.copyWith(color: Colors.white38),
-                                      ),
-                                    ],
-                                  ),
-                                  const Spacer(),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.gemEmerald.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      'LV.${post.authorLevel}',
-                                      style: AppTextStyles.caption.copyWith(color: AppColors.gemEmerald),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                post.content,
-                                style: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  IconButton(
-                                    icon: Icon(
-                                      post.isLiked ? Icons.favorite : Icons.favorite_border,
-                                      color: post.isLiked ? Colors.pinkAccent : Colors.white60,
-                                      size: 20,
-                                    ),
-                                    onPressed: () {
-                                      context.read<MomentsBloc>().add(ToggleLikePostEvent(post.id));
-                                    },
-                                  ),
-                                  Text(
-                                    '${post.likesCount}',
-                                    style: AppTextStyles.caption.copyWith(color: Colors.white70),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  const Icon(Icons.chat_bubble_outline, color: Colors.white60, size: 18),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${post.commentsCount}',
-                                    style: AppTextStyles.caption.copyWith(color: Colors.white70),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        );
+                        return _buildMomentCard(context, post);
                       },
                     );
                   },
@@ -155,20 +80,19 @@ class MomentsTabPage extends StatelessWidget {
             ],
           ),
 
-          // Floating Action Button matching Screenshot 3: Orange circle with paper plane icon
+          // Floating Action Button matching Screenshot 2/3/8: Orange circle with paper plane icon
           Positioned(
             right: 20,
             bottom: 24,
             child: GestureDetector(
               onTap: () {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (ctx) => CreateMomentSheet(
-                    onPost: (content) {
-                      context.read<MomentsBloc>().add(AddMomentPostEvent(content: content));
-                    },
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => BlocProvider.value(
+                      value: context.read<MomentsBloc>(),
+                      child: const CreateMomentPage(),
+                    ),
                   ),
                 );
               },
@@ -227,6 +151,183 @@ class MomentsTabPage extends StatelessWidget {
           }).toList(),
         );
       },
+    );
+  }
+
+  Widget _buildMomentCard(BuildContext context, MomentPost post) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Author Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+            child: Row(
+              children: [
+                const CustomAvatar(radius: 20),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      post.authorName,
+                      style: const TextStyle(
+                        color: Color(0xFF1E293B),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        const Text('5m • ', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                        const Icon(Icons.public, color: Color(0xFF94A3B8), size: 12),
+                        const SizedBox(width: 6),
+                        Text(post.countryFlag, style: const TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                const Icon(Icons.more_horiz_rounded, color: Color(0xFF94A3B8)),
+              ],
+            ),
+          ),
+
+          // Caption Text
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            child: Text(
+              post.content,
+              style: const TextStyle(
+                color: Color(0xFF1E293B),
+                fontSize: 14,
+                height: 1.4,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // 2x2 Photo Grid (Screenshot 5)
+          if (post.imageUrls.isNotEmpty)
+            _buildPhotoGrid(post.imageUrls),
+
+          // Bottom Action Bar: Like & Comment
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Row(
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    context.read<MomentsBloc>().add(ToggleLikePostEvent(post.id));
+                  },
+                  child: Row(
+                    children: [
+                      Icon(
+                        post.isLiked ? Icons.favorite : Icons.favorite_border_rounded,
+                        color: post.isLiked ? const Color(0xFFE11D48) : const Color(0xFF64748B),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${post.likesCount}',
+                        style: TextStyle(
+                          color: post.isLiked ? const Color(0xFFE11D48) : const Color(0xFF64748B),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 24),
+                Row(
+                  children: [
+                    const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF64748B), size: 19),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${post.commentsCount}',
+                      style: const TextStyle(
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                const Icon(Icons.share_outlined, color: Color(0xFF64748B), size: 20),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoGrid(List<String> images) {
+    final count = images.length > 4 ? 4 : images.length;
+    final int extraCount = images.length - 4;
+
+    return AspectRatio(
+      aspectRatio: 1.0,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: GridView.builder(
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: count,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 3,
+              crossAxisSpacing: 3,
+              childAspectRatio: 1.0,
+            ),
+            itemBuilder: (context, idx) {
+              final bool isLastWithMore = idx == 3 && extraCount > 0;
+
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    images[idx],
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: const Color(0xFFE2E8F0),
+                      child: const Icon(Icons.image, color: Colors.grey),
+                    ),
+                  ),
+                  if (isLastWithMore)
+                    Container(
+                      color: Colors.black.withOpacity(0.55),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '+$extraCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
     );
   }
 }

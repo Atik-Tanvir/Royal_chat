@@ -10,7 +10,12 @@ import '../bloc/party_state.dart';
 import '../widgets/party_category_bar.dart';
 import '../widgets/party_room_card.dart';
 import '../widgets/create_room_dialog.dart';
+import '../widgets/room_restriction_dialog.dart';
 import 'live_audio_room_page.dart';
+import 'region_selector_page.dart';
+import '../../../leaderboard/presentation/pages/leaderboard_page.dart';
+import '../../../profile/presentation/pages/coins_wallet_page.dart';
+import '../../../chat/presentation/pages/system_messages_page.dart';
 
 class PartyTabPage extends StatelessWidget {
   const PartyTabPage({super.key});
@@ -28,47 +33,81 @@ class PartyTabPage extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                   child: Row(
                     children: [
-                      const CurrencyBadge(amount: '158.98K'),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const CoinsWalletPage(),
+                            ),
+                          );
+                        },
+                        child: const CurrencyBadge(amount: '158.98K'),
+                      ),
                       const SizedBox(width: 8),
                       // "win more" badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF8A2387), Color(0xFFE94057), Color(0xFFF27121)],
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFE94057).withOpacity(0.4),
-                              blurRadius: 6,
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const CoinsWalletPage(),
                             ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'win more',
-                              style: AppTextStyles.caption.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontStyle: FontStyle.italic,
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF8A2387), Color(0xFFE94057), Color(0xFFF27121)],
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFE94057).withOpacity(0.4),
+                                blurRadius: 6,
                               ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(Icons.emoji_events, color: AppColors.goldCoin, size: 14),
-                          ],
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'win more',
+                                style: AppTextStyles.caption.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(Icons.emoji_events, color: AppColors.goldCoin, size: 14),
+                            ],
+                          ),
                         ),
                       ),
                       const Spacer(),
                       IconButton(
                         icon: const Icon(Icons.mail_outline_rounded, color: AppColors.goldCoin),
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const SystemMessagesPage(),
+                            ),
+                          );
+                        },
                       ),
                       IconButton(
                         icon: const Icon(Icons.emoji_events_rounded, color: AppColors.goldCoin),
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const LeaderboardPage(),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -79,73 +118,83 @@ class PartyTabPage extends StatelessWidget {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF2C5E43), Color(0xFF1E7B54), Color(0xFFE5A93B)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: AppColors.borderGold.withOpacity(0.6), width: 1.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.25),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const LeaderboardPage(initialTabIndex: 1),
                         ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'BlockMe Ranking',
-                                style: AppTextStyles.headerMedium.copyWith(
-                                  color: const Color(0xFFFFF8DC),
-                                  shadows: [
-                                    const Shadow(
-                                      color: Colors.black45,
-                                      blurRadius: 4,
-                                      offset: Offset(1, 2),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2C5E43), Color(0xFF1E7B54), Color(0xFFE5A93B)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: AppColors.borderGold.withOpacity(0.6), width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'BlockMe Ranking',
+                                  style: AppTextStyles.headerMedium.copyWith(
+                                    color: const Color(0xFFFFF8DC),
+                                    shadows: [
+                                      const Shadow(
+                                        color: Colors.black45,
+                                        blurRadius: 4,
+                                        offset: Offset(1, 2),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.emoji_events, color: AppColors.goldCoin, size: 18),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Monthly \$8,360',
+                                      style: AppTextStyles.titleBold.copyWith(
+                                        color: AppColors.goldCoin,
+                                        fontSize: 16,
+                                      ),
                                     ),
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.diamond, color: AppColors.gemCyan, size: 14),
                                   ],
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  const Icon(Icons.emoji_events, color: AppColors.goldCoin, size: 18),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Monthly \$8,360',
-                                    style: AppTextStyles.titleBold.copyWith(
-                                      color: AppColors.goldCoin,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  const Icon(Icons.diamond, color: AppColors.gemCyan, size: 14),
-                                ],
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.black26,
-                            border: Border.all(color: AppColors.borderGold),
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.black26,
+                              border: Border.all(color: AppColors.borderGold),
+                            ),
+                            child: const Icon(Icons.military_tech_rounded, color: AppColors.goldCoin, size: 30),
                           ),
-                          child: const Icon(Icons.military_tech_rounded, color: AppColors.goldCoin, size: 30),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -200,9 +249,29 @@ class PartyTabPage extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   child: Row(
                     children: [
-                      _buildFilterChip('All', icon: Icons.translate),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const RegionSelectorPage(),
+                            ),
+                          );
+                        },
+                        child: _buildFilterChip('All', icon: Icons.translate),
+                      ),
                       const SizedBox(width: 10),
-                      _buildFilterChip('All', icon: Icons.language),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const RegionSelectorPage(),
+                            ),
+                          );
+                        },
+                        child: _buildFilterChip('All', icon: Icons.language),
+                      ),
                     ],
                   ),
                 ),
@@ -294,15 +363,31 @@ class PartyTabPage extends StatelessWidget {
             child: Center(
               child: GestureDetector(
                 onTap: () {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => CreateRoomDialog(
-                      onCreate: (title, category) {
-                        context.read<PartyBloc>().add(
-                              CreateNewRoomEvent(title: title, category: category),
-                            );
-                      },
-                    ),
+                  RoomRestrictionDialog.show(
+                    context,
+                    onJoinHotRoom: () {
+                      final rooms = context.read<PartyBloc>().state.allRooms;
+                      if (rooms.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => LiveAudioRoomPage(room: rooms.first),
+                          ),
+                        );
+                      }
+                    },
+                    onBypassCreate: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => CreateRoomDialog(
+                          onCreate: (title, category) {
+                            context.read<PartyBloc>().add(
+                                  CreateNewRoomEvent(title: title, category: category),
+                                );
+                          },
+                        ),
+                      );
+                    },
                   );
                 },
                 child: Container(

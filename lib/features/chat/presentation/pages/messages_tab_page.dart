@@ -7,6 +7,7 @@ import '../../domain/entities/chat_item.dart';
 import '../bloc/chat_bloc.dart';
 import '../bloc/chat_state.dart';
 import 'conversation_page.dart';
+import 'system_messages_page.dart';
 
 class MessagesTabPage extends StatelessWidget {
   const MessagesTabPage({super.key});
@@ -103,12 +104,21 @@ class MessagesTabPage extends StatelessWidget {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ConversationPage(chat: chat),
-          ),
-        );
+        if (chat.title == 'System Message') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const SystemMessagesPage(),
+            ),
+          );
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ConversationPage(chat: chat),
+            ),
+          );
+        }
       },
       leading: Stack(
         clipBehavior: Clip.none,

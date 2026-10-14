@@ -5,6 +5,7 @@ class AppColors {
 
   // Primary Theme Colors (Emerald / Jade Greens)
   static const Color primaryGreen = Color(0xFF0D8866);
+  static const Color darkEmerald = Color(0xFF095A43);
   static const Color bgDarkGreen = Color(0xFF095A43);
   static const Color bgMidGreen = Color(0xFF0E7356);
   static const Color bgLightGreen = Color(0xFF139671);

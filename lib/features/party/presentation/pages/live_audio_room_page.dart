@@ -4,6 +4,11 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/widgets/custom_avatar.dart';
 import '../../domain/entities/party_room.dart';
+import '../widgets/lucky_race_game_drawer.dart';
+import '../widgets/user_profile_popover.dart';
+import '../../../profile/presentation/pages/coins_wallet_page.dart';
+import '../../../chat/presentation/pages/conversation_page.dart';
+import '../../../chat/domain/entities/chat_item.dart';
 
 class LiveAudioRoomPage extends StatefulWidget {
   final PartyRoom room;
@@ -108,7 +113,8 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
             child: Column(
               children: [
                 _buildHeader(),
-                const SizedBox(height: 12),
+                _buildPkBattleBar(),
+                const SizedBox(height: 8),
                 _buildSeatsGrid(),
                 const Spacer(),
                 if (_activeGiftBanner != null) _buildGiftBanner(),
@@ -117,6 +123,83 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPkBattleBar() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1E3A8A), Color(0xFF881337)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 6,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Blue team
+          const Icon(Icons.shield, color: Color(0xFF60A5FA), size: 16),
+          const SizedBox(width: 4),
+          const Text(
+            'BLUE 450',
+            style: TextStyle(
+              color: Color(0xFF93C5FD),
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const Spacer(),
+          // Center PK Timer
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFD700),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'PK ',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  '04:30',
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Spacer(),
+          // Red team
+          const Text(
+            '720 RED',
+            style: TextStyle(
+              color: Color(0xFFFCA5A5),
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(width: 4),
+          const Icon(Icons.shield, color: Color(0xFFF87171), size: 16),
         ],
       ),
     );
@@ -179,13 +262,13 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
 
   Widget _buildSeatsGrid() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 4,
-          mainAxisSpacing: 16,
+          mainAxisSpacing: 14,
           crossAxisSpacing: 12,
           childAspectRatio: 0.85,
         ),
@@ -196,99 +279,158 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
           final bool isSpeaking = seat['isSpeaking'] as bool;
           final bool isMuted = seat['isMuted'] as bool;
 
-          return Column(
-            children: [
-              Stack(
-                alignment: Alignment.center,
-                clipBehavior: Clip.none,
-                children: [
-                  if (isSpeaking)
-                    Container(
-                      width: 58,
-                      height: 58,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.gemEmerald, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.gemEmerald.withOpacity(0.5),
-                            blurRadius: 8,
+          return GestureDetector(
+            onTap: () {
+              if (isOccupied) {
+                UserProfilePopover.show(
+                  context,
+                  username: seat['name'] ?? 'User',
+                  avatarUrl: seat['avatar'] as String?,
+                  countryFlag: '🇧🇩',
+                  countryName: 'Bangladesh',
+                  gender: index % 2 == 0 ? '♀' : '♂',
+                  age: 19 + index,
+                  wealthLevel: (seat['isHost'] as bool) ? 5 : 2,
+                  charmLevel: (seat['isHost'] as bool) ? 6 : 3,
+                  onSendGift: () {
+                    Navigator.pop(context);
+                    _showGiftModal();
+                  },
+                  onMention: () {
+                    Navigator.pop(context);
+                    setState(() {
+                      _msgController.text = '@${seat['name']} ';
+                    });
+                  },
+                  onChat: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ConversationPage(
+                          chat: ChatItem(
+                            id: 'chat_$index',
+                            title: seat['name'] ?? 'User',
+                            subtitle: 'Hey! Nice meeting you in ${widget.room.title}',
+                            timestamp: 'Just now',
+                            unreadCount: 0,
+                            type: ChatType.direct,
+                            avatarUrl: seat['avatar'] as String?,
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  isOccupied
-                      ? CustomAvatar(
-                          imageUrl: seat['avatar'] as String?,
-                          radius: 24,
-                          hasVipFrame: seat['isHost'] as bool,
-                        )
-                      : Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.1),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.2),
-                              width: 1.5,
+                    );
+                  },
+                );
+              } else {
+                setState(() {
+                  seat['avatar'] = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb';
+                  seat['name'] = 'Me';
+                  seat['isSpeaking'] = true;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('You joined Mic Seat ${index + 1}! 🎤'),
+                    backgroundColor: AppColors.gemEmerald,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            },
+            child: Column(
+              children: [
+                Stack(
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  children: [
+                    if (isSpeaking)
+                      Container(
+                        width: 58,
+                        height: 58,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.gemEmerald, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.gemEmerald.withValues(alpha: 0.5),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                      ),
+                    isOccupied
+                        ? CustomAvatar(
+                            imageUrl: seat['avatar'] as String?,
+                            radius: 24,
+                            hasVipFrame: seat['isHost'] as bool,
+                          )
+                        : Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withValues(alpha: 0.1),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.add,
+                              color: Colors.white70,
+                              size: 22,
                             ),
                           ),
+                    if (isOccupied && isMuted)
+                      Positioned(
+                        bottom: -2,
+                        right: -2,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Colors.black87,
+                            shape: BoxShape.circle,
+                          ),
                           child: const Icon(
-                            Icons.add,
-                            color: Colors.white70,
-                            size: 22,
-                          ),
-                        ),
-                  if (isOccupied && isMuted)
-                    Positioned(
-                      bottom: -2,
-                      right: -2,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
-                          color: Colors.black87,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.mic_off,
-                          size: 12,
-                          color: Colors.redAccent,
-                        ),
-                      ),
-                    ),
-                  if (seat['isHost'] as bool)
-                    Positioned(
-                      top: -6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: AppColors.goldCoin,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text(
-                          'HOST',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 8,
-                            fontWeight: FontWeight.w900,
+                            Icons.mic_off,
+                            size: 12,
+                            color: Colors.redAccent,
                           ),
                         ),
                       ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                isOccupied ? (seat['name'] ?? 'Guest') : '${index + 1}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.caption.copyWith(
-                  color: isOccupied ? Colors.white : Colors.white38,
-                  fontWeight: isOccupied ? FontWeight.w600 : FontWeight.normal,
+                    if (seat['isHost'] as bool)
+                      Positioned(
+                        top: -6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: AppColors.goldCoin,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'HOST',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 6),
+                Text(
+                  isOccupied ? (seat['name'] ?? 'Guest') : '${index + 1}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption.copyWith(
+                    color: isOccupied ? Colors.white : Colors.white38,
+                    fontWeight: isOccupied ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
           );
         },
       ),
@@ -428,6 +570,22 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
             icon: _isMicMuted ? Icons.mic_off : Icons.mic,
             color: _isMicMuted ? Colors.redAccent : AppColors.gemEmerald,
             onTap: () => setState(() => _isMicMuted = !_isMicMuted),
+          ),
+          // Lucky Race Mini-game trigger
+          _buildCircleAction(
+            icon: Icons.sports_score_rounded,
+            color: const Color(0xFFFF5252),
+            onTap: () {
+              LuckyRaceGameDrawer.show(
+                context,
+                onRechargeTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CoinsWalletPage()),
+                  );
+                },
+              );
+            },
           ),
           const SizedBox(width: 10),
 

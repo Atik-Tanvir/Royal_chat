@@ -10,6 +10,8 @@ import '../bloc/block_me_event.dart';
 import '../bloc/block_me_state.dart';
 import '../widgets/embossed_block_widget.dart';
 import '../widgets/shape_piece_widget.dart';
+import '../../../leaderboard/presentation/pages/leaderboard_page.dart';
+import '../../../profile/presentation/pages/coins_wallet_page.dart';
 
 class GamesTabPage extends StatefulWidget {
   const GamesTabPage({super.key});
@@ -69,30 +71,46 @@ class _GamesTabPageState extends State<GamesTabPage> with SingleTickerProviderSt
   Widget _buildTopBar(BlockMeState state) {
     return Row(
       children: [
-        const CurrencyBadge(amount: '158.98K'),
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CoinsWalletPage()),
+            );
+          },
+          child: const CurrencyBadge(amount: '158.98K'),
+        ),
         const SizedBox(width: 8),
         // Win more pill
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF8A2387), Color(0xFFE94057), Color(0xFFF27121)],
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              Text(
-                'win more',
-                style: AppTextStyles.caption.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontStyle: FontStyle.italic,
-                ),
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CoinsWalletPage()),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF8A2387), Color(0xFFE94057), Color(0xFFF27121)],
               ),
-              const SizedBox(width: 4),
-              const Icon(Icons.emoji_events, color: AppColors.goldCoin, size: 14),
-            ],
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  'win more',
+                  style: AppTextStyles.caption.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.emoji_events, color: AppColors.goldCoin, size: 14),
+              ],
+            ),
           ),
         ),
         const Spacer(),
@@ -132,85 +150,95 @@ class _GamesTabPageState extends State<GamesTabPage> with SingleTickerProviderSt
   }
 
   Widget _buildRankingBanner(BlockMeState state) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF139671).withOpacity(0.4),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.15)),
-      ),
-      child: Row(
-        children: [
-          // Game Icon Thumbnail
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              color: const Color(0xFF0C4636),
-              border: Border.all(color: AppColors.gemEmerald, width: 1.5),
-            ),
-            child: const Icon(Icons.grid_4x4_rounded, color: AppColors.gemEmerald, size: 24),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const LeaderboardPage(initialTabIndex: 1),
           ),
-          const SizedBox(width: 12),
-          // Daily Stats
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.monetization_on, color: AppColors.goldCoin, size: 12),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Daily ${state.dailyRank}',
-                      style: AppTextStyles.caption.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                Text(
-                  'Prize 3,363,328',
-                  style: AppTextStyles.caption.copyWith(color: AppColors.goldCoin, fontSize: 9),
-                ),
-              ],
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF139671).withOpacity(0.4),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withOpacity(0.15)),
+        ),
+        child: Row(
+          children: [
+            // Game Icon Thumbnail
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: const Color(0xFF0C4636),
+                border: Border.all(color: AppColors.gemEmerald, width: 1.5),
+              ),
+              child: const Icon(Icons.grid_4x4_rounded, color: AppColors.gemEmerald, size: 24),
             ),
-          ),
-          // Monthly Stats
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.monetization_on, color: AppColors.goldCoin, size: 12),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Monthly ${state.monthlyRank}',
-                      style: AppTextStyles.caption.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                Text(
-                  'Prize 15,000,000',
-                  style: AppTextStyles.caption.copyWith(color: AppColors.goldCoin, fontSize: 9),
-                ),
-              ],
+            const SizedBox(width: 12),
+            // Daily Stats
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.monetization_on, color: AppColors.goldCoin, size: 12),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Daily ${state.dailyRank}',
+                        style: AppTextStyles.caption.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'Prize 3,363,328',
+                    style: AppTextStyles.caption.copyWith(color: AppColors.goldCoin, fontSize: 9),
+                  ),
+                ],
+              ),
             ),
-          ),
-          // Competitor Avatar
-          Container(
-            padding: const EdgeInsets.all(2),
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.black26,
+            // Monthly Stats
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.monetization_on, color: AppColors.goldCoin, size: 12),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Monthly ${state.monthlyRank}',
+                        style: AppTextStyles.caption.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'Prize 15,000,000',
+                    style: AppTextStyles.caption.copyWith(color: AppColors.goldCoin, fontSize: 9),
+                  ),
+                ],
+              ),
             ),
-            child: const CircleAvatar(
-              radius: 12,
-              backgroundColor: AppColors.accentOrange,
-              child: Icon(Icons.person, size: 14, color: Colors.white),
+            // Competitor Avatar
+            Container(
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.black26,
+              ),
+              child: const CircleAvatar(
+                radius: 12,
+                backgroundColor: AppColors.accentOrange,
+                child: Icon(Icons.person, size: 14, color: Colors.white),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

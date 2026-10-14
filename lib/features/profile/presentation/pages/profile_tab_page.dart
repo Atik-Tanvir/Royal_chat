@@ -5,10 +5,14 @@ import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/widgets/cat_mascot_widget.dart';
 import '../../../../core/widgets/gemgala_background.dart';
 import '../bloc/profile_bloc.dart';
-import '../bloc/profile_event.dart';
 import '../bloc/profile_state.dart';
+import '../../domain/entities/user_profile.dart';
 import '../widgets/wallet_card_widget.dart';
 import '../widgets/withdrawal_ticker_widget.dart';
+import '../widgets/signin_reward_dialog.dart';
+import 'coins_wallet_page.dart';
+import 'user_detail_page.dart';
+import '../../../leaderboard/presentation/pages/leaderboard_page.dart';
 
 class ProfileTabPage extends StatelessWidget {
   const ProfileTabPage({super.key});
@@ -45,71 +49,86 @@ class ProfileTabPage extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileHeader(BuildContext context, dynamic profile) {
-    return Row(
-      children: [
-        // Avatar with stylish hat matching Screenshot 1
-        Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white,
-            border: Border.all(color: Colors.white.withOpacity(0.4), width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 6,
-                offset: const Offset(0, 3),
-              ),
-            ],
+  Widget _buildProfileHeader(BuildContext context, UserProfile profile) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => UserDetailPage(
+              username: profile.nickname,
+              userId: profile.userId,
+              countryFlag: '🇧🇩',
+              countryName: profile.country,
+            ),
           ),
-          child: const Center(
-            child: CatMascotWidget(size: 64, withHat: true),
+        );
+      },
+      child: Row(
+        children: [
+          // Avatar with stylish hat matching Screenshot 1
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              border: Border.all(color: Colors.white.withOpacity(0.4), width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 6,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: const Center(
+              child: CatMascotWidget(size: 64, withHat: true),
+            ),
           ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    profile.nickname,
-                    style: AppTextStyles.headerMedium.copyWith(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      profile.nickname,
+                      style: AppTextStyles.headerMedium.copyWith(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right, color: Colors.white60, size: 20),
-                ],
-              ),
-              const SizedBox(height: 6),
-              // Badges row: Country, Gender/Age, Level, VIP
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: [
-                  _buildPillBadge(
-                    color: const Color(0xFF137752),
-                    icon: Icons.circle,
-                    iconColor: Colors.red,
-                    label: profile.country,
-                  ),
-                  _buildPillBadge(
-                    color: const Color(0xFF1976D2),
-                    label: profile.gender,
-                  ),
-                  _buildDiamondBadge('LV${profile.level}'),
-                  _buildVipBadge(),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 4),
+                    const Icon(Icons.chevron_right, color: Colors.white60, size: 20),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                // Badges row: Country, Gender/Age, Level, VIP
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    _buildPillBadge(
+                      color: const Color(0xFF137752),
+                      icon: Icons.circle,
+                      iconColor: Colors.red,
+                      label: profile.country,
+                    ),
+                    _buildPillBadge(
+                      color: const Color(0xFF1976D2),
+                      label: profile.gender,
+                    ),
+                    _buildDiamondBadge('LV${profile.level}'),
+                    _buildVipBadge(),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -193,7 +212,7 @@ class ProfileTabPage extends StatelessWidget {
     );
   }
 
-  Widget _buildSocialStats(dynamic profile) {
+  Widget _buildSocialStats(UserProfile profile) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
@@ -221,7 +240,7 @@ class ProfileTabPage extends StatelessWidget {
     );
   }
 
-  Widget _buildWalletSection(BuildContext context, dynamic profile) {
+  Widget _buildWalletSection(BuildContext context, UserProfile profile) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -250,7 +269,10 @@ class ProfileTabPage extends StatelessWidget {
               type: WalletCardType.coin,
               amount: profile.formattedCoins,
               onTap: () {
-                _showRechargeModal(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CoinsWalletPage()),
+                );
               },
             ),
           ],
@@ -260,54 +282,62 @@ class ProfileTabPage extends StatelessWidget {
   }
 
   Widget _buildFirstRechargeBanner(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFF6E40), Color(0xFFFF3D00)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const CoinsWalletPage()),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFF6E40), Color(0xFFFF3D00)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFF3D00).withOpacity(0.35),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFFF3D00).withOpacity(0.35),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'First Recharge +75%',
-                style: AppTextStyles.titleBold.copyWith(
-                  color: Colors.white,
-                  fontStyle: FontStyle.italic,
-                  fontSize: 16,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  'First Recharge +75%',
+                  style: AppTextStyles.titleBold.copyWith(
+                    color: Colors.white,
+                    fontStyle: FontStyle.italic,
+                    fontSize: 16,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              const Icon(Icons.monetization_on, color: AppColors.goldCoin, size: 16),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildBundleItem(icon: Icons.card_giftcard, label: '\$1', isSpecial: true),
-              const Text('+', style: TextStyle(color: Colors.white70, fontSize: 18)),
-              _buildBundleItem(icon: Icons.monetization_on, label: '796.2K'),
-              const Text('+', style: TextStyle(color: Colors.white70, fontSize: 18)),
-              _buildBundleItem(icon: Icons.diamond, label: 'LV1'),
-              const Text('+', style: TextStyle(color: Colors.white70, fontSize: 18)),
-              _buildBundleItem(icon: Icons.circle_outlined, label: 'Frame'),
-            ],
-          ),
-        ],
+                const SizedBox(width: 6),
+                const Icon(Icons.monetization_on, color: AppColors.goldCoin, size: 16),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildBundleItem(icon: Icons.card_giftcard, label: '\$1', isSpecial: true),
+                const Text('+', style: TextStyle(color: Colors.white70, fontSize: 18)),
+                _buildBundleItem(icon: Icons.monetization_on, label: '796.2K'),
+                const Text('+', style: TextStyle(color: Colors.white70, fontSize: 18)),
+                _buildBundleItem(icon: Icons.diamond, label: 'LV1'),
+                const Text('+', style: TextStyle(color: Colors.white70, fontSize: 18)),
+                _buildBundleItem(icon: Icons.circle_outlined, label: 'Frame'),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -360,21 +390,37 @@ class ProfileTabPage extends StatelessWidget {
                 const Icon(Icons.chevron_right, color: Colors.white54, size: 20),
               ],
             ),
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const LeaderboardPage(initialTabIndex: 3),
+                ),
+              );
+            },
           ),
           Divider(color: Colors.white.withOpacity(0.06), height: 1),
           _buildMenuItem(
             icon: Icons.verified_user_rounded,
             iconColor: AppColors.gemCyan,
             title: 'Top Offers',
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const LeaderboardPage(initialTabIndex: 0),
+                ),
+              );
+            },
           ),
           Divider(color: Colors.white.withOpacity(0.06), height: 1),
           _buildMenuItem(
             icon: Icons.event_note_rounded,
             iconColor: AppColors.accentOrange,
             title: 'Sign-in PK',
-            onTap: () {},
+            onTap: () {
+              SignInRewardDialog.show(context);
+            },
           ),
         ],
       ),
@@ -433,60 +479,6 @@ class ProfileTabPage extends StatelessWidget {
               onPressed: () => Navigator.pop(ctx),
               child: const Text('Request Withdrawal', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showRechargeModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: AppColors.dialogSurface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Recharge Coins', style: AppTextStyles.titleBold.copyWith(color: AppColors.goldCoin)),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                _buildRechargeOption(context, '10,000 Coins', '\$0.99'),
-                _buildRechargeOption(context, '50,000 Coins', '\$4.99'),
-                _buildRechargeOption(context, '120,000 Coins', '\$9.99'),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRechargeOption(BuildContext context, String coins, String price) {
-    return GestureDetector(
-      onTap: () {
-        context.read<ProfileBloc>().add(const RechargeCoinsEvent(10000));
-        Navigator.pop(context);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.black26,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.borderGold),
-        ),
-        child: Column(
-          children: [
-            Text(coins, style: AppTextStyles.caption.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
-            Text(price, style: AppTextStyles.caption.copyWith(color: AppColors.goldCoin)),
           ],
         ),
       ),
