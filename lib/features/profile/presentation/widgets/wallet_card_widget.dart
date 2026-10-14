@@ -106,9 +106,9 @@ class WalletCardWidget extends StatelessWidget {
                                 ),
                               ),
                               child: const Icon(
-                                Icons.pets,
+                                Icons.monetization_on_rounded,
                                 color: Color(0xFFB87818),
-                                size: 20,
+                                size: 22,
                               ),
                             ),
                     ),

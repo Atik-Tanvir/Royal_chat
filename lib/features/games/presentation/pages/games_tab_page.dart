@@ -230,7 +230,7 @@ class _GamesTabPageState extends State<GamesTabPage> with SingleTickerProviderSt
               const CircleAvatar(
                 radius: 10,
                 backgroundColor: Colors.purple,
-                child: Icon(Icons.pets, size: 10, color: Colors.white),
+                child: Icon(Icons.workspace_premium, size: 10, color: Colors.white),
               ),
               const SizedBox(width: 4),
               const CircleAvatar(

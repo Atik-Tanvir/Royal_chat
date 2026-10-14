@@ -346,7 +346,7 @@ class PartyTabPage extends StatelessWidget {
                     delegate: SliverChildListDelegate([
                       _buildRoomSection(context, 'Lucky Number', luckyNumberRooms, Icons.casino),
                       _buildRoomSection(context, 'Lucky Race', luckyRaceRooms, Icons.sports_motorsports),
-                      _buildRoomSection(context, 'Chatroom', chatRooms, Icons.pets),
+                      _buildRoomSection(context, 'Chatroom', chatRooms, Icons.forum_rounded),
                       const SizedBox(height: 90), // Space for floating Create Room button
                     ]),
                   );

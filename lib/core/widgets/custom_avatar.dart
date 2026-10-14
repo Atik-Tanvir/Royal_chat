@@ -124,7 +124,7 @@ class CustomAvatar extends StatelessWidget {
       child: Center(
         child: fallbackIcon ??
             const Icon(
-              Icons.pets,
+              Icons.person_rounded,
               color: AppColors.primaryGreen,
               size: 20,
             ),

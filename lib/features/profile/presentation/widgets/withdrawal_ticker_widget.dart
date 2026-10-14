@@ -39,7 +39,7 @@ class WithdrawalTickerWidget extends StatelessWidget {
               color: Colors.white,
             ),
             child: const Center(
-              child: Icon(Icons.pets, color: AppColors.primaryGreen, size: 14),
+              child: Icon(Icons.monetization_on_rounded, color: AppColors.goldCoinDark, size: 14),
             ),
           ),
           const SizedBox(width: 8),
