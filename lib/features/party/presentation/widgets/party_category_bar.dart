@@ -16,7 +16,7 @@ class PartyCategoryBar extends StatelessWidget {
       {'name': 'All', 'icon': Icons.grid_view_rounded, 'color': const Color(0xFF00E5A3)},
       {'name': 'Lucky Number', 'icon': Icons.casino_rounded, 'color': const Color(0xFF8B5CF6)},
       {'name': 'Lucky Race', 'icon': Icons.sports_motorsports_rounded, 'color': const Color(0xFFFFB800)},
-      {'name': 'Chatroom', 'icon': Icons.pets_rounded, 'color': const Color(0xFFFF6B6B)},
+      {'name': 'Chatroom', 'icon': Icons.forum_rounded, 'color': const Color(0xFFFF6B6B)},
       {'name': 'PK', 'icon': Icons.offline_bolt_rounded, 'color': const Color(0xFFFF3366)},
     ];
 

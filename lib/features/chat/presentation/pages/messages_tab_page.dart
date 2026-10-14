@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/widgets/gemgala_background.dart';
+import '../../../../core/widgets/royal_brand_logo.dart';
 import '../../domain/entities/chat_item.dart';
 import '../bloc/chat_bloc.dart';
 import '../bloc/chat_state.dart';
@@ -22,6 +23,8 @@ class MessagesTabPage extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Row(
               children: [
+                const RoyalBrandLogo(size: 26),
+                const SizedBox(width: 10),
                 Text(
                   'Messages',
                   style: AppTextStyles.headerLarge.copyWith(fontSize: 20),

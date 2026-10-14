@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/custom_avatar.dart';
+import '../../../../core/widgets/royal_brand_logo.dart';
 
 class UserDetailPage extends StatefulWidget {
   final String userId;
@@ -38,7 +39,7 @@ class _UserDetailPageState extends State<UserDetailPage> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFD7F0E6),
+      backgroundColor: const Color(0xFF031A14),
       body: Stack(
         children: [
           // Top Cat Mascot Illustration Cover
@@ -52,48 +53,35 @@ class _UserDetailPageState extends State<UserDetailPage> with SingleTickerProvid
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Color(0xFFBCE7D6), Color(0xFFDFF6ED)],
+                  colors: [Color(0xFF031A14), Color(0xFF07382D)],
                 ),
               ),
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  // Cat Illustration
+                  // Royal 3D Emblem Avatar
                   Positioned(
-                    bottom: 20,
-                    child: Column(
-                      children: [
-                        // Hat + Face
-                        Stack(
-                          alignment: Alignment.topCenter,
-                          children: [
-                            Container(
-                              width: 220,
-                              height: 180,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white,
-                              ),
-                              child: const Center(
-                                child: Text('🐱', style: TextStyle(fontSize: 120)),
-                              ),
-                            ),
-                            // Fedora hat overlay
-                            Positioned(
-                              top: -10,
-                              right: 25,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF262626),
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: const Text('🎩', style: TextStyle(fontSize: 32)),
-                              ),
-                            ),
-                          ],
+                    bottom: 30,
+                    child: Container(
+                      width: 140,
+                      height: 140,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const RadialGradient(
+                          colors: [Color(0xFF0F7658), Color(0xFF04221B)],
                         ),
-                      ],
+                        border: Border.all(color: AppColors.borderGold, width: 2.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.goldCoin.withValues(alpha: 0.35),
+                            blurRadius: 20,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: const Center(
+                        child: RoyalBrandLogo(size: 96),
+                      ),
                     ),
                   ),
 
@@ -178,15 +166,16 @@ class _UserDetailPageState extends State<UserDetailPage> with SingleTickerProvid
             ),
           ),
 
-          // Bottom White Sheet Card with Info / Moments Tabs
+          // Bottom Royal Sheet Card with Info / Moments Tabs
           Positioned.fill(
             top: 320,
             child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+              decoration: BoxDecoration(
+                color: const Color(0xFF063025),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
                 boxShadow: [
-                  BoxShadow(color: Colors.black12, blurRadius: 16, offset: Offset(0, -6)),
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 16, offset: const Offset(0, -6)),
                 ],
               ),
               child: Column(
@@ -198,12 +187,12 @@ class _UserDetailPageState extends State<UserDetailPage> with SingleTickerProvid
                     child: TabBar(
                       controller: _tabController,
                       isScrollable: true,
-                      indicatorColor: AppColors.gemEmerald,
+                      indicatorColor: AppColors.goldCoin,
                       indicatorWeight: 3,
                       indicatorSize: TabBarIndicatorSize.label,
-                      labelColor: const Color(0xFF0D5E46),
+                      labelColor: AppColors.goldCoin,
                       labelStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                      unselectedLabelColor: const Color(0xFF94A3B8),
+                      unselectedLabelColor: Colors.white54,
                       unselectedLabelStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.normal),
                       tabs: const [
                         Tab(text: 'Info'),
@@ -211,7 +200,7 @@ class _UserDetailPageState extends State<UserDetailPage> with SingleTickerProvid
                       ],
                     ),
                   ),
-                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                  Divider(height: 1, color: Colors.white.withValues(alpha: 0.08)),
 
                   // Tab Views
                   Expanded(
@@ -249,7 +238,7 @@ class _UserDetailPageState extends State<UserDetailPage> with SingleTickerProvid
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 4),

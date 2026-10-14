@@ -43,7 +43,7 @@ class CustomBottomNavBar extends StatelessWidget {
           ),
           _buildNavItem(
             index: 1,
-            icon: Icons.people_alt_rounded,
+            icon: Icons.record_voice_over_rounded,
             label: 'Party',
           ),
           _buildNavItem(
@@ -59,7 +59,7 @@ class CustomBottomNavBar extends StatelessWidget {
           ),
           _buildNavItem(
             index: 4,
-            icon: Icons.pets_rounded,
+            icon: Icons.person_rounded,
             label: 'Me',
           ),
         ],

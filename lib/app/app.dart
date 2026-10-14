@@ -40,7 +40,7 @@ class GemgalaApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
-        title: 'Gemgala',
+        title: 'Royal Chat Live',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.theme,
         home: const MainNavigationPage(),

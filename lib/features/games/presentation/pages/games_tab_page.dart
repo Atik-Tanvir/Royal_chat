@@ -4,6 +4,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/widgets/currency_badge.dart';
 import '../../../../core/widgets/gemgala_background.dart';
+import '../../../../core/widgets/royal_brand_logo.dart';
 import '../../domain/entities/polyomino_shape.dart';
 import '../bloc/block_me_bloc.dart';
 import '../bloc/block_me_event.dart';
@@ -71,6 +72,8 @@ class _GamesTabPageState extends State<GamesTabPage> with SingleTickerProviderSt
   Widget _buildTopBar(BlockMeState state) {
     return Row(
       children: [
+        const RoyalBrandLogo(size: 32, showText: true),
+        const Spacer(),
         GestureDetector(
           onTap: () {
             Navigator.push(
@@ -81,39 +84,6 @@ class _GamesTabPageState extends State<GamesTabPage> with SingleTickerProviderSt
           child: const CurrencyBadge(amount: '158.98K'),
         ),
         const SizedBox(width: 8),
-        // Win more pill
-        GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CoinsWalletPage()),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF8A2387), Color(0xFFE94057), Color(0xFFF27121)],
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                Text(
-                  'win more',
-                  style: AppTextStyles.caption.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.emoji_events, color: AppColors.goldCoin, size: 14),
-              ],
-            ),
-          ),
-        ),
-        const Spacer(),
         // Hearts / Lives counter
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

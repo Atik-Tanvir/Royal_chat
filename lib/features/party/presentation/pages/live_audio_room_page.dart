@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/widgets/custom_avatar.dart';
+import '../../../../core/widgets/royal_brand_logo.dart';
 import '../../domain/entities/party_room.dart';
 import '../widgets/lucky_race_game_drawer.dart';
 import '../widgets/user_profile_popover.dart';
@@ -79,14 +80,89 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
     super.dispose();
   }
 
-  void _triggerGift(String giftName, String icon) {
+  void _triggerGift(String giftName, String icon, int cost) {
     setState(() {
-      _activeGiftBanner = 'You sent $giftName to ${widget.room.hostName} $icon';
+      _activeGiftBanner = '✨ You gifted $icon $giftName to ${widget.room.hostName}! (+$cost Charm)';
+      _messages.add({'sender': '👑 Me', 'text': 'sent $icon $giftName to Host'});
     });
     _giftBannerTimer?.cancel();
-    _giftBannerTimer = Timer(const Duration(seconds: 3), () {
+    _giftBannerTimer = Timer(const Duration(seconds: 4), () {
       if (mounted) setState(() => _activeGiftBanner = null);
     });
+  }
+
+  void _showMySeatOptions(int seatIndex) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Color(0xFF063025),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Mic Seat ${seatIndex + 1} Settings',
+              style: AppTextStyles.titleBold.copyWith(color: AppColors.goldCoin),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: Icon(
+                _isMicMuted ? Icons.mic : Icons.mic_off,
+                color: _isMicMuted ? AppColors.gemEmerald : Colors.redAccent,
+              ),
+              title: Text(
+                _isMicMuted ? 'Unmute Microphone' : 'Mute Microphone',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  _isMicMuted = !_isMicMuted;
+                  _seats[seatIndex]['isMuted'] = _isMicMuted;
+                  _seats[seatIndex]['isSpeaking'] = !_isMicMuted;
+                });
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.exit_to_app_rounded, color: Colors.amber),
+              title: const Text(
+                'Leave Mic Seat',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  _seats[seatIndex]['avatar'] = null;
+                  _seats[seatIndex]['name'] = null;
+                  _seats[seatIndex]['isSpeaking'] = false;
+                  _seats[seatIndex]['isMuted'] = false;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('You left the mic seat.'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -220,11 +296,19 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  widget.room.title,
-                  style: AppTextStyles.titleMedium.copyWith(color: Colors.white),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        widget.room.title,
+                        style: AppTextStyles.titleMedium.copyWith(color: Colors.white),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const RoyalBrandLogo(size: 18),
+                  ],
                 ),
                 Text(
                   'ID: ${widget.room.id} • ${widget.room.category}',
@@ -281,7 +365,9 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
 
           return GestureDetector(
             onTap: () {
-              if (isOccupied) {
+              if (seat['name'] == 'Me') {
+                _showMySeatOptions(index);
+              } else if (isOccupied) {
                 UserProfilePopover.show(
                   context,
                   username: seat['name'] ?? 'User',
@@ -327,10 +413,11 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
                   seat['avatar'] = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb';
                   seat['name'] = 'Me';
                   seat['isSpeaking'] = true;
+                  seat['isMuted'] = false;
                 });
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('You joined Mic Seat ${index + 1}! 🎤'),
+                    content: Text('You joined Mic Seat ${index + 1}! 🎤 (Tap seat to manage)'),
                     backgroundColor: AppColors.gemEmerald,
                     duration: const Duration(seconds: 2),
                   ),
@@ -606,10 +693,11 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
     required VoidCallback onTap,
   }) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
-        width: 42,
-        height: 42,
+        width: 44,
+        height: 44,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: color.withOpacity(0.2),
@@ -630,19 +718,19 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
 }
 
 class _GiftBottomSheet extends StatelessWidget {
-  final Function(String name, String icon) onSendGift;
+  final Function(String name, String icon, int cost) onSendGift;
 
   const _GiftBottomSheet({required this.onSendGift});
 
   @override
   Widget build(BuildContext context) {
     final gifts = [
-      {'name': 'Rose', 'cost': 10, 'icon': '🌹'},
-      {'name': 'Kiss', 'cost': 50, 'icon': '💋'},
-      {'name': 'Cat Paw', 'cost': 100, 'icon': '🐾'},
-      {'name': 'Crown', 'cost': 500, 'icon': '👑'},
-      {'name': 'Sports Car', 'cost': 2000, 'icon': '🏎️'},
-      {'name': 'Rocket', 'cost': 5000, 'icon': '🚀'},
+      {'name': 'Royal Rose', 'cost': 10, 'icon': '🌹'},
+      {'name': 'Emerald Gem', 'cost': 50, 'icon': '💎'},
+      {'name': 'Imperial Crown', 'cost': 200, 'icon': '👑'},
+      {'name': 'Golden Lion', 'cost': 500, 'icon': '🦁'},
+      {'name': 'Royal Supercar', 'cost': 2000, 'icon': '🏎️'},
+      {'name': 'Diamond Castle', 'cost': 5000, 'icon': '🏰'},
     ];
 
     return Container(
@@ -692,7 +780,7 @@ class _GiftBottomSheet extends StatelessWidget {
               return GestureDetector(
                 onTap: () {
                   Navigator.pop(context);
-                  onSendGift(g['name'] as String, g['icon'] as String);
+                  onSendGift(g['name'] as String, g['icon'] as String, g['cost'] as int);
                 },
                 child: Container(
                   decoration: BoxDecoration(

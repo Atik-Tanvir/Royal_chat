@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
-import '../../../../core/widgets/cat_mascot_widget.dart';
+import '../../../../core/widgets/custom_avatar.dart';
+import '../../../../core/widgets/royal_brand_logo.dart';
 import '../../../../core/widgets/gemgala_background.dart';
 import '../bloc/profile_bloc.dart';
 import '../bloc/profile_state.dart';
@@ -66,25 +67,11 @@ class ProfileTabPage extends StatelessWidget {
       },
       child: Row(
         children: [
-          // Avatar with stylish hat matching Screenshot 1
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white,
-              border: Border.all(color: Colors.white.withOpacity(0.4), width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 6,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: const Center(
-              child: CatMascotWidget(size: 64, withHat: true),
-            ),
+          // Avatar with Royal VIP Frame
+          CustomAvatar(
+            imageUrl: profile.avatarUrl,
+            radius: 36,
+            hasVipFrame: true,
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -196,18 +183,25 @@ class ProfileTabPage extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFFFB300), Color(0xFFFF6F00)],
+          colors: [Color(0xFFFFDF00), Color(0xFFF59E0B)],
         ),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: const Text(
-        'VIP',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 9,
-          fontWeight: FontWeight.w900,
-          fontStyle: FontStyle.italic,
-        ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          RoyalBrandLogo(size: 13),
+          SizedBox(width: 3),
+          Text(
+            'VIP',
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
       ),
     );
   }

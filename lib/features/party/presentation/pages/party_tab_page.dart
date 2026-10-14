@@ -4,6 +4,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/widgets/currency_badge.dart';
 import '../../../../core/widgets/gemgala_background.dart';
+import '../../../../core/widgets/royal_brand_logo.dart';
 import '../bloc/party_bloc.dart';
 import '../bloc/party_event.dart';
 import '../bloc/party_state.dart';
@@ -27,12 +28,16 @@ class PartyTabPage extends StatelessWidget {
         children: [
           CustomScrollView(
             slivers: [
-              // Top Bar
+              // Top Bar with Royal Brand Logo & Currencies
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                   child: Row(
                     children: [
+                      // Royal Brand Logo & Title
+                      const RoyalBrandLogo(size: 34, showText: true),
+                      const Spacer(),
+                      // Wallet Coins Badge
                       GestureDetector(
                         onTap: () {
                           Navigator.push(
@@ -44,51 +49,9 @@ class PartyTabPage extends StatelessWidget {
                         },
                         child: const CurrencyBadge(amount: '158.98K'),
                       ),
-                      const SizedBox(width: 8),
-                      // "win more" badge
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const CoinsWalletPage(),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF8A2387), Color(0xFFE94057), Color(0xFFF27121)],
-                            ),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFE94057).withOpacity(0.4),
-                                blurRadius: 6,
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'win more',
-                                style: AppTextStyles.caption.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              const Icon(Icons.emoji_events, color: AppColors.goldCoin, size: 14),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const Spacer(),
+                      const SizedBox(width: 4),
                       IconButton(
-                        icon: const Icon(Icons.mail_outline_rounded, color: AppColors.goldCoin),
+                        icon: const Icon(Icons.mail_outline_rounded, color: AppColors.goldCoin, size: 22),
                         onPressed: () {
                           Navigator.push(
                             context,
@@ -99,7 +62,7 @@ class PartyTabPage extends StatelessWidget {
                         },
                       ),
                       IconButton(
-                        icon: const Icon(Icons.emoji_events_rounded, color: AppColors.goldCoin),
+                        icon: const Icon(Icons.emoji_events_rounded, color: AppColors.goldCoin, size: 22),
                         onPressed: () {
                           Navigator.push(
                             context,
@@ -114,7 +77,7 @@ class PartyTabPage extends StatelessWidget {
                 ),
               ),
 
-              // Hero Promotional Banner ("BlockMe Ranking")
+              // Royal Hero Promotional Banner ("Royal Championship VIP")
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -131,17 +94,29 @@ class PartyTabPage extends StatelessWidget {
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF2C5E43), Color(0xFF1E7B54), Color(0xFFE5A93B)],
+                          colors: [
+                            Color(0xFF0C4638),
+                            Color(0xFF136852),
+                            Color(0xFF2A5240),
+                          ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: AppColors.borderGold.withOpacity(0.6), width: 1.5),
+                        border: Border.all(
+                          color: AppColors.borderGold.withValues(alpha: 0.6),
+                          width: 1.5,
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.25),
-                            blurRadius: 10,
+                            color: Colors.black.withValues(alpha: 0.35),
+                            blurRadius: 12,
                             offset: const Offset(0, 4),
+                          ),
+                          BoxShadow(
+                            color: AppColors.goldCoin.withValues(alpha: 0.15),
+                            blurRadius: 16,
+                            spreadRadius: -2,
                           ),
                         ],
                       ),
@@ -151,32 +126,47 @@ class PartyTabPage extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'BlockMe Ranking',
-                                  style: AppTextStyles.headerMedium.copyWith(
-                                    color: const Color(0xFFFFF8DC),
-                                    shadows: [
-                                      const Shadow(
-                                        color: Colors.black45,
-                                        blurRadius: 4,
-                                        offset: Offset(1, 2),
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.goldCoin,
+                                        borderRadius: BorderRadius.circular(6),
                                       ),
-                                    ],
-                                  ),
+                                      child: const Text(
+                                        'SEASON 1',
+                                        style: TextStyle(
+                                          color: Colors.black,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w900,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Royal Voice Arena',
+                                      style: AppTextStyles.headerMedium.copyWith(
+                                        color: const Color(0xFFFFF8DC),
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 6),
                                 Row(
                                   children: [
                                     const Icon(Icons.emoji_events, color: AppColors.goldCoin, size: 18),
                                     const SizedBox(width: 6),
                                     Text(
-                                      'Monthly \$8,360',
+                                      'Grand Pool \$10,000',
                                       style: AppTextStyles.titleBold.copyWith(
                                         color: AppColors.goldCoin,
-                                        fontSize: 16,
+                                        fontSize: 15,
                                       ),
                                     ),
-                                    const SizedBox(width: 4),
+                                    const SizedBox(width: 6),
                                     const Icon(Icons.diamond, color: AppColors.gemCyan, size: 14),
                                   ],
                                 ),
@@ -184,14 +174,24 @@ class PartyTabPage extends StatelessWidget {
                             ),
                           ),
                           Container(
-                            width: 48,
-                            height: 48,
+                            width: 50,
+                            height: 50,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: Colors.black26,
-                              border: Border.all(color: AppColors.borderGold),
+                              gradient: const RadialGradient(
+                                colors: [Color(0xFF1E3A2F), Color(0xFF0B2920)],
+                              ),
+                              border: Border.all(color: AppColors.borderGold, width: 1.5),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.goldCoin.withValues(alpha: 0.3),
+                                  blurRadius: 8,
+                                ),
+                              ],
                             ),
-                            child: const Icon(Icons.military_tech_rounded, color: AppColors.goldCoin, size: 30),
+                            child: const Center(
+                              child: RoyalBrandLogo(size: 34),
+                            ),
                           ),
                         ],
                       ),
@@ -391,17 +391,17 @@ class PartyTabPage extends StatelessWidget {
                   );
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 13),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF0F9D58), Color(0xFF0B6638)],
+                      colors: [Color(0xFFFFDF00), Color(0xFFF59E0B)],
                     ),
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(color: AppColors.borderGold, width: 2),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.8), width: 1.5),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.4),
-                        blurRadius: 12,
+                        color: AppColors.goldCoin.withValues(alpha: 0.4),
+                        blurRadius: 16,
                         offset: const Offset(0, 4),
                       ),
                     ],
@@ -409,13 +409,14 @@ class PartyTabPage extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.sports_esports_rounded, color: Colors.white, size: 22),
+                      const Icon(Icons.mic_none_rounded, color: Colors.black87, size: 22),
                       const SizedBox(width: 8),
                       Text(
-                        'Create a Room',
+                        'Host Royal Party',
                         style: AppTextStyles.titleBold.copyWith(
-                          color: Colors.white,
+                          color: Colors.black,
                           fontSize: 15,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
                     ],

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
-import '../../../../core/widgets/cat_mascot_widget.dart';
+import '../../../../core/widgets/royal_brand_logo.dart';
 import '../../../../core/widgets/gemgala_background.dart';
 import '../../../../core/widgets/custom_avatar.dart';
 import '../bloc/moments_bloc.dart';
@@ -43,22 +43,47 @@ class MomentsTabPage extends StatelessWidget {
                     final bool showEmpty = state.activeTab != 'Moments' || state.posts.isEmpty;
 
                     if (showEmpty) {
-                      // Matching Screenshot 2: Empty state with Cat Mascot
                       return Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const CatMascotWidget(size: 96, withHat: false),
-                            const SizedBox(height: 16),
+                            const RoyalBrandLogo(size: 80),
+                            const SizedBox(height: 18),
                             Text(
-                              'No Moment',
+                              'No Royal Moments Yet',
                               style: AppTextStyles.titleMedium.copyWith(
-                                color: Colors.white70,
-                                fontSize: 16,
-                                letterSpacing: 0.5,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 17,
                               ),
                             ),
-                            const SizedBox(height: 60),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Be the first to share a post with the party!',
+                              style: TextStyle(color: Colors.white60, fontSize: 13),
+                            ),
+                            const SizedBox(height: 20),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const CreateMomentPage(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.add_photo_alternate_rounded, size: 18),
+                              label: const Text('Post a Moment'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.gemEmerald,
+                                foregroundColor: Colors.black,
+                                textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 40),
                           ],
                         ),
                       );
