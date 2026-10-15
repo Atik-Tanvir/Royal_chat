@@ -1,12 +1,16 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/config/auth_session_manager.dart';
 import '../../../../core/config/supabase_config.dart';
 import '../../../../core/widgets/royal_brand_logo.dart';
 import '../../../navigation/presentation/pages/main_navigation_page.dart';
+import '../../../profile/presentation/bloc/profile_bloc.dart';
+import '../../../profile/presentation/bloc/profile_event.dart';
 
 /// Luxury Login Screen for Royal Chat Live.
 /// 
@@ -41,7 +45,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       if (session != null && mounted) {
         // Sync or register user in Supabase 'profiles' table
         await _syncProfile(session.user);
-        _navigateToHome();
+        if (mounted) {
+          context.read<ProfileBloc>().add(LoadUserProfileEvent());
+          _navigateToHome();
+        }
       }
     });
   }
@@ -59,17 +66,91 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           user.userMetadata?['name'] as String? ??
           user.email?.split('@').first ??
           'RoyalUser';
-      final avatar = user.userMetadata?['avatar_url'] as String? ?? '';
+      final avatar = user.userMetadata?['avatar_url'] as String? ??
+          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200';
 
-      await SupabaseConfig.client.from('profiles').upsert({
-        'id': user.id,
-        'nickname': name,
-        'avatar_url': avatar,
-        'email': user.email,
-        'updated_at': DateTime.now().toIso8601String(),
-      });
+      final existing = await SupabaseConfig.client
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (existing == null) {
+        await SupabaseConfig.client.from('profiles').insert({
+          'id': user.id,
+          'nickname': name,
+          'avatar_url': avatar,
+          'country': 'Bangladesh',
+          'country_flag': '🇧🇩',
+          'gender': '♂ 22',
+          'age': 22,
+          'level': 1,
+          'is_vip': false,
+          'coin_balance': 10000,
+          'gem_balance': 0,
+          'friends_count': 0,
+          'following_count': 0,
+          'fans_count': 0,
+          'visitors_count': 0,
+          'is_online': true,
+        });
+      } else {
+        await SupabaseConfig.client.from('profiles').update({
+          'nickname': name,
+          'avatar_url': avatar.isNotEmpty ? avatar : existing['avatar_url'],
+          'is_online': true,
+        }).eq('id', user.id);
+      }
     } catch (e) {
       debugPrint('[LoginPage] Profile sync error: $e');
+    }
+  }
+
+  Future<void> _signInAsGuest() async {
+    setState(() => _isLoading = true);
+    try {
+      final guestId = 'guest_${DateTime.now().millisecondsSinceEpoch}';
+      final guestName = 'Guest_${guestId.substring(guestId.length - 6)}';
+      const guestAvatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200';
+
+      // Insert real dynamic guest profile into Supabase
+      await SupabaseConfig.client.from('profiles').insert({
+        'id': guestId,
+        'nickname': guestName,
+        'avatar_url': guestAvatar,
+        'country': 'Bangladesh',
+        'country_flag': '🇧🇩',
+        'gender': '♂ 20',
+        'age': 20,
+        'level': 1,
+        'is_vip': false,
+        'coin_balance': 5000,
+        'gem_balance': 0,
+        'friends_count': 0,
+        'following_count': 0,
+        'fans_count': 0,
+        'visitors_count': 0,
+        'is_online': true,
+      });
+
+      // Save persistent guest ID
+      await AuthSessionManager.setGuestUserId(guestId);
+
+      if (mounted) {
+        context.read<ProfileBloc>().add(LoadUserProfileEvent());
+        _navigateToHome();
+      }
+    } catch (e) {
+      debugPrint('[LoginPage] Guest login error: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Guest Login Error: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
   }
 
@@ -257,9 +338,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
                     const SizedBox(height: 16),
 
-                    // Quick Guest / Demo exploration mode
+                    // Quick Guest dynamic exploration mode
                     TextButton(
-                      onPressed: _navigateToHome,
+                      onPressed: _isLoading ? null : _signInAsGuest,
                       child: Text(
                         'Continue as Guest',
                         style: AppTextStyles.bodyMedium.copyWith(

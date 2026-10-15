@@ -11,7 +11,11 @@ import '../widgets/user_profile_popover.dart';
 import '../../../profile/presentation/pages/coins_wallet_page.dart';
 import '../../../chat/presentation/pages/conversation_page.dart';
 import '../../../chat/domain/entities/chat_item.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/config/auth_session_manager.dart';
 import '../../../../core/config/supabase_config.dart';
+import '../../../profile/presentation/bloc/profile_bloc.dart';
+import '../../../profile/presentation/bloc/profile_state.dart';
 
 class LiveAudioRoomPage extends StatefulWidget {
   final PartyRoom room;
@@ -93,7 +97,7 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
 
       if (response.isNotEmpty && mounted) {
         setState(() {
-          final currentUser = SupabaseConfig.client.auth.currentUser;
+          final currentUserId = AuthSessionManager.currentUserId;
           for (var row in response as List) {
             final idx = (row['seat_index'] as num?)?.toInt() ?? 0;
             if (idx >= 0 && idx < _seats.length) {
@@ -107,7 +111,7 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
                 _seats[idx]['avatar'] = uAvatar.isNotEmpty ? uAvatar : null;
                 _seats[idx]['isMuted'] = isMuted;
 
-                if (currentUser != null && uid == currentUser.id) {
+                if (currentUserId != null && uid == currentUserId) {
                   _mySeatIndex = idx;
                   _isMicMuted = isMuted;
                 }
@@ -125,11 +129,11 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
     setState(() => _isConnectingAudio = true);
 
     final user = SupabaseConfig.client.auth.currentUser;
-    final myId = user?.id ?? 'user_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+    final myId = AuthSessionManager.currentUserId ?? 'user_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
     final myName = user?.userMetadata?['full_name'] as String? ??
         user?.userMetadata?['name'] as String? ??
         user?.email?.split('@').first ??
-        'RoyalUser';
+        myId;
 
     _audioService.onActiveSpeakersChanged = (speakers) {
       if (!mounted) return;
@@ -305,8 +309,8 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
     });
 
     try {
-      final user = SupabaseConfig.client.auth.currentUser;
-      final myId = user?.id ?? '30961573';
+      final myId = AuthSessionManager.currentUserId;
+      if (myId == null) return;
       final profileRes = await SupabaseConfig.client.from('profiles').select('coin_balance').eq('id', myId).maybeSingle();
       if (profileRes != null) {
         final currentCoins = (profileRes['coin_balance'] as num?)?.toDouble() ?? 0.0;
@@ -1004,18 +1008,26 @@ class _GiftBottomSheet extends StatelessWidget {
                 'Send Virtual Gift',
                 style: AppTextStyles.titleBold.copyWith(color: AppColors.goldCoin),
               ),
-              Row(
-                children: [
-                  const Icon(Icons.monetization_on, color: AppColors.goldCoin, size: 16),
-                  const SizedBox(width: 4),
-                  Text(
-                    '158.98K',
-                    style: AppTextStyles.caption.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+              BlocBuilder<ProfileBloc, ProfileState>(
+                builder: (context, profileState) {
+                  final coins = profileState.profile.coinBalance;
+                  final coinStr = coins >= 1000
+                      ? '${(coins / 1000).toStringAsFixed(2)}K'
+                      : coins.toInt().toString();
+                  return Row(
+                    children: [
+                      const Icon(Icons.monetization_on, color: AppColors.goldCoin, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        coinStr,
+                        style: AppTextStyles.caption.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ],
           ),

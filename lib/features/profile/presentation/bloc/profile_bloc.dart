@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/config/auth_session_manager.dart';
 import '../../../../core/config/supabase_config.dart';
 import '../../domain/entities/user_profile.dart';
 import 'profile_event.dart';
@@ -11,6 +12,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     on<RechargeCoinsEvent>(_onRechargeCoins);
     on<WithdrawGemsEvent>(_onWithdrawGems);
     on<UpdateProfileDetailsEvent>(_onUpdateProfileDetails);
+    on<SignOutEvent>(_onSignOut);
 
     // Initial dynamic fetch from Supabase
     add(LoadUserProfileEvent());
@@ -21,8 +23,12 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     Emitter<ProfileState> emit,
   ) async {
     try {
+      final currentUserId = AuthSessionManager.currentUserId;
+      if (currentUserId == null || currentUserId.isEmpty) {
+        return;
+      }
+
       final user = SupabaseConfig.client.auth.currentUser;
-      final currentUserId = user?.id ?? '30961573';
       final defaultName = user?.userMetadata?['full_name'] as String? ??
           user?.userMetadata?['name'] as String? ??
           user?.email?.split('@').first ??
@@ -38,17 +44,17 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
 
       // If profile doesn't exist yet, insert a dynamic new profile for the user
       if (profileRes == null) {
-        await SupabaseConfig.client.from('profiles').upsert({
+        await SupabaseConfig.client.from('profiles').insert({
           'id': currentUserId,
           'nickname': defaultName,
           'avatar_url': defaultAvatar,
           'country': 'Bangladesh',
           'country_flag': '🇧🇩',
-          'gender': '♂ 19',
-          'age': 19,
+          'gender': '♂ 20',
+          'age': 20,
           'level': 1,
-          'is_vip': true,
-          'coin_balance': 161480,
+          'is_vip': false,
+          'coin_balance': 5000,
           'gem_balance': 0,
           'friends_count': 0,
           'following_count': 0,
@@ -71,21 +77,21 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
           nickname: profileRes['nickname'] as String? ?? defaultName,
           avatarUrl: profileRes['avatar_url'] as String? ?? defaultAvatar,
           country: profileRes['country'] as String? ?? 'Bangladesh',
-          gender: profileRes['gender'] as String? ?? '♂ 19',
-          age: (profileRes['age'] as num?)?.toInt() ?? 19,
+          gender: profileRes['gender'] as String? ?? '♂ 20',
+          age: (profileRes['age'] as num?)?.toInt() ?? 20,
           level: (profileRes['level'] as num?)?.toInt() ?? 1,
-          isVip: profileRes['is_vip'] as bool? ?? true,
+          isVip: profileRes['is_vip'] as bool? ?? false,
           friendsCount: (profileRes['friends_count'] as num?)?.toInt() ?? 0,
           followingCount: (profileRes['following_count'] as num?)?.toInt() ?? 0,
           fansCount: (profileRes['fans_count'] as num?)?.toInt() ?? 0,
           visitorsCount: (profileRes['visitors_count'] as num?)?.toInt() ?? 0,
           gemBalance: (profileRes['gem_balance'] as num?)?.toDouble() ?? 0.0,
-          coinBalance: (profileRes['coin_balance'] as num?)?.toDouble() ?? 161480.0,
+          coinBalance: (profileRes['coin_balance'] as num?)?.toDouble() ?? 0.0,
         );
       }
 
       // 2. Fetch latest withdrawal ticker text from Supabase withdrawals table
-      String ticker = state.recentWithdrawalText;
+      String ticker = 'Welcome to Royal Chat Live';
       final withdrawalRes = await SupabaseConfig.client
           .from('withdrawals')
           .select()
@@ -229,34 +235,36 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     }
   }
 
-  static ProfileState _createInitialState() {
-    final user = SupabaseConfig.client.auth.currentUser;
-    final defaultName = user?.userMetadata?['full_name'] as String? ??
-        user?.userMetadata?['name'] as String? ??
-        user?.email?.split('@').first ??
-        'RoyalUser';
-    final defaultAvatar = user?.userMetadata?['avatar_url'] as String? ?? '';
+  Future<void> _onSignOut(
+    SignOutEvent event,
+    Emitter<ProfileState> emit,
+  ) async {
+    await AuthSessionManager.signOut();
+    emit(_createInitialState());
+  }
 
+  static ProfileState _createInitialState() {
+    final activeId = AuthSessionManager.currentUserId ?? '';
     final profile = UserProfile(
-      userId: user?.id ?? '30961573',
-      nickname: defaultName,
-      avatarUrl: defaultAvatar,
-      country: 'Bangladesh',
-      gender: '♂ 19',
-      age: 19,
+      userId: activeId,
+      nickname: activeId.isNotEmpty ? activeId : 'Royal User',
+      avatarUrl: '',
+      country: '',
+      gender: '',
+      age: 0,
       level: 1,
-      isVip: true,
+      isVip: false,
       friendsCount: 0,
       followingCount: 0,
       fansCount: 0,
       visitorsCount: 0,
       gemBalance: 0.0,
-      coinBalance: 161480.0,
+      coinBalance: 0.0,
     );
 
     return ProfileState(
       profile: profile,
-      recentWithdrawalText: 'yanboyy withdrew \$10.0',
+      recentWithdrawalText: 'Welcome to Royal Chat Live',
     );
   }
 }

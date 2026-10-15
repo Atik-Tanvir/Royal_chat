@@ -16,6 +16,8 @@ import 'live_audio_room_page.dart';
 import 'region_selector_page.dart';
 import '../../../leaderboard/presentation/pages/leaderboard_page.dart';
 import '../../../profile/presentation/pages/coins_wallet_page.dart';
+import '../../../profile/presentation/bloc/profile_bloc.dart';
+import '../../../profile/presentation/bloc/profile_state.dart';
 import '../../../chat/presentation/pages/system_messages_page.dart';
 
 class PartyTabPage extends StatelessWidget {
@@ -37,17 +39,24 @@ class PartyTabPage extends StatelessWidget {
                       // Royal Brand Logo & Title
                       const RoyalBrandLogo(size: 34, showText: true),
                       const Spacer(),
-                      // Wallet Coins Badge
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const CoinsWalletPage(),
-                            ),
+                      BlocBuilder<ProfileBloc, ProfileState>(
+                        builder: (context, profileState) {
+                          final coins = profileState.profile.coinBalance;
+                          final amountStr = coins >= 1000
+                              ? '${(coins / 1000).toStringAsFixed(2)}K'
+                              : coins.toInt().toString();
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const CoinsWalletPage(),
+                                ),
+                              );
+                            },
+                            child: CurrencyBadge(amount: amountStr),
                           );
                         },
-                        child: const CurrencyBadge(amount: '158.98K'),
                       ),
                       const SizedBox(width: 4),
                       IconButton(

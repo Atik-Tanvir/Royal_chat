@@ -18,8 +18,8 @@ class UserDetailPage extends StatefulWidget {
 
   const UserDetailPage({
     super.key,
-    this.userId = '30961573',
-    this.username = 'RoyalUser',
+    this.userId = '',
+    this.username = '',
     this.countryFlag = '🇧🇩',
     this.countryName = 'Bangladesh',
   });

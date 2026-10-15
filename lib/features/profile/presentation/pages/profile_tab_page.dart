@@ -16,7 +16,6 @@ import 'coins_wallet_page.dart';
 import 'user_detail_page.dart';
 import '../../../leaderboard/presentation/pages/leaderboard_page.dart';
 import '../../../auth/presentation/pages/login_page.dart';
-import '../../../../core/config/supabase_config.dart';
 
 class ProfileTabPage extends StatelessWidget {
   const ProfileTabPage({super.key});
@@ -425,7 +424,7 @@ class ProfileTabPage extends StatelessWidget {
             iconColor: Colors.redAccent,
             title: 'Sign Out (Switch Account)',
             onTap: () async {
-              await SupabaseConfig.client.auth.signOut();
+              context.read<ProfileBloc>().add(SignOutEvent());
               if (context.mounted) {
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const LoginPage()),

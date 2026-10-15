@@ -11,7 +11,7 @@ import '../features/party/presentation/bloc/party_bloc.dart';
 import '../features/party/presentation/bloc/party_event.dart';
 import '../features/profile/presentation/bloc/profile_bloc.dart';
 
-import '../core/config/supabase_config.dart';
+import '../core/config/auth_session_manager.dart';
 import '../features/auth/presentation/pages/login_page.dart';
 
 class GemgalaApp extends StatelessWidget {
@@ -20,7 +20,7 @@ class GemgalaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final partyRepository = PartyRepositoryImpl();
-    final bool isAuthenticated = SupabaseConfig.client.auth.currentSession != null;
+    final bool isAuthenticated = AuthSessionManager.hasActiveSession;
 
     return MultiBlocProvider(
       providers: [

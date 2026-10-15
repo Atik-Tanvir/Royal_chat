@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/config/auth_session_manager.dart';
 import '../../../../core/config/supabase_config.dart';
 import '../../domain/entities/chat_item.dart';
 import '../../domain/entities/message_bubble.dart';
@@ -74,7 +75,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       if (profilesRes.isNotEmpty) {
         for (var p in profilesRes as List) {
           final pid = p['id']?.toString() ?? '';
-          final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+          final currentUserId = AuthSessionManager.currentUserId;
           if (pid == currentUserId) continue;
 
           final name = p['nickname']?.toString() ?? 'Royal Friend';

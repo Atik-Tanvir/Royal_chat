@@ -14,7 +14,7 @@ class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
             entries: [],
             isAnonymous: false,
             myRank: 99,
-            myBalance: '161.48K',
+            myBalance: '0',
           ),
         ) {
     on<LoadLeaderboardEvent>(_onLoadLeaderboard);

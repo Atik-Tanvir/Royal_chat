@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/config/auth_session_manager.dart';
 import '../../../../core/config/supabase_config.dart';
 import '../../domain/entities/moment_post.dart';
 import 'moments_event.dart';
@@ -131,10 +132,10 @@ class MomentsBloc extends Bloc<MomentsEvent, MomentsState> {
 
   Future<void> _saveToSupabase(MomentPost post) async {
     try {
-      final user = SupabaseConfig.client.auth.currentUser;
+      final authorId = AuthSessionManager.currentUserId ?? 'guest_${DateTime.now().millisecondsSinceEpoch}';
       await SupabaseConfig.client.from('moments').insert({
         'id': post.id,
-        'user_id': user?.id ?? 'guest_${DateTime.now().millisecondsSinceEpoch}',
+        'user_id': authorId,
         'user_name': post.authorName,
         'user_avatar': post.authorAvatar,
         'content': post.content,

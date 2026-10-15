@@ -13,6 +13,8 @@ import '../widgets/embossed_block_widget.dart';
 import '../widgets/shape_piece_widget.dart';
 import '../../../leaderboard/presentation/pages/leaderboard_page.dart';
 import '../../../profile/presentation/pages/coins_wallet_page.dart';
+import '../../../profile/presentation/bloc/profile_bloc.dart';
+import '../../../profile/presentation/bloc/profile_state.dart';
 
 class GamesTabPage extends StatefulWidget {
   const GamesTabPage({super.key});
@@ -74,14 +76,22 @@ class _GamesTabPageState extends State<GamesTabPage> with SingleTickerProviderSt
       children: [
         const RoyalBrandLogo(size: 32, showText: true),
         const Spacer(),
-        GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const CoinsWalletPage()),
+        BlocBuilder<ProfileBloc, ProfileState>(
+          builder: (context, profileState) {
+            final coins = profileState.profile.coinBalance;
+            final amountStr = coins >= 1000
+                ? '${(coins / 1000).toStringAsFixed(2)}K'
+                : coins.toInt().toString();
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CoinsWalletPage()),
+                );
+              },
+              child: CurrencyBadge(amount: amountStr),
             );
           },
-          child: const CurrencyBadge(amount: '158.98K'),
         ),
         const SizedBox(width: 8),
         // Hearts / Lives counter

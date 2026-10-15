@@ -47,3 +47,6 @@ class UpdateProfileDetailsEvent extends ProfileEvent {
   @override
   List<Object?> get props => [nickname, avatarUrl, country, gender, age];
 }
+
+class SignOutEvent extends ProfileEvent {}
+

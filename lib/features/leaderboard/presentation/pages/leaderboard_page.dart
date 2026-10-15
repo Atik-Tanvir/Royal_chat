@@ -7,6 +7,8 @@ import '../../domain/entities/leaderboard_entry.dart';
 import '../bloc/leaderboard_bloc.dart';
 import '../bloc/leaderboard_event.dart';
 import '../bloc/leaderboard_state.dart';
+import '../../../profile/presentation/bloc/profile_bloc.dart';
+import '../../../profile/presentation/bloc/profile_state.dart';
 
 class LeaderboardPage extends StatelessWidget {
   final int initialTabIndex;
@@ -361,61 +363,73 @@ class _LeaderboardView extends StatelessWidget {
               ),
             ],
           ),
-          child: Row(
-            children: [
-              Text(
-                '${state.myRank}+',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const CustomAvatar(radius: 18),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+          child: BlocBuilder<ProfileBloc, ProfileState>(
+            builder: (context, profileState) {
+              final myProfile = profileState.profile;
+              final balanceStr = myProfile.coinBalance >= 1000
+                  ? '${(myProfile.coinBalance / 1000).toStringAsFixed(1)}K'
+                  : myProfile.coinBalance.toInt().toString();
+
+              return Row(
                 children: [
-                  const Text(
-                    'User30961573',
-                    style: TextStyle(
-                      color: Colors.white,
+                  Text(
+                    '${state.myRank}+',
+                    style: const TextStyle(
+                      color: Colors.white70,
                       fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                      fontSize: 15,
                     ),
                   ),
-                  Row(
+                  const SizedBox(width: 12),
+                  CustomAvatar(
+                    imageUrl: myProfile.avatarUrl.isNotEmpty ? myProfile.avatarUrl : null,
+                    radius: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        state.myBalance,
+                        myProfile.nickname.isNotEmpty ? myProfile.nickname : 'Me',
                         style: const TextStyle(
-                          color: AppColors.goldCoin,
-                          fontSize: 12,
+                          color: Colors.white,
                           fontWeight: FontWeight.bold,
+                          fontSize: 13,
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.monetization_on, color: AppColors.goldCoin, size: 12),
+                      Row(
+                        children: [
+                          Text(
+                            balanceStr,
+                            style: const TextStyle(
+                              color: AppColors.goldCoin,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.monetization_on, color: AppColors.goldCoin, size: 12),
+                        ],
+                      ),
                     ],
                   ),
+                  const Spacer(),
+                  const Text(
+                    'Anonymous',
+                    style: TextStyle(color: Colors.white60, fontSize: 13),
+                  ),
+                  const SizedBox(width: 6),
+                  Switch(
+                    value: state.isAnonymous,
+                    activeColor: AppColors.gemEmerald,
+                    onChanged: (_) {
+                      context.read<LeaderboardBloc>().add(ToggleAnonymousEvent());
+                    },
+                  ),
                 ],
-              ),
-              const Spacer(),
-              const Text(
-                'Anonymous',
-                style: TextStyle(color: Colors.white60, fontSize: 13),
-              ),
-              const SizedBox(width: 6),
-              Switch(
-                value: state.isAnonymous,
-                activeColor: AppColors.gemEmerald,
-                onChanged: (_) {
-                  context.read<LeaderboardBloc>().add(ToggleAnonymousEvent());
-                },
-              ),
-            ],
+              );
+            },
           ),
         );
       },
