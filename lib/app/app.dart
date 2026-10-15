@@ -11,12 +11,16 @@ import '../features/party/presentation/bloc/party_bloc.dart';
 import '../features/party/presentation/bloc/party_event.dart';
 import '../features/profile/presentation/bloc/profile_bloc.dart';
 
+import '../core/config/supabase_config.dart';
+import '../features/auth/presentation/pages/login_page.dart';
+
 class GemgalaApp extends StatelessWidget {
   const GemgalaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     final partyRepository = PartyRepositoryImpl();
+    final bool isAuthenticated = SupabaseConfig.client.auth.currentSession != null;
 
     return MultiBlocProvider(
       providers: [
@@ -43,7 +47,7 @@ class GemgalaApp extends StatelessWidget {
         title: 'Royal Chat Live',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.theme,
-        home: const MainNavigationPage(),
+        home: isAuthenticated ? const MainNavigationPage() : const LoginPage(),
       ),
     );
   }
