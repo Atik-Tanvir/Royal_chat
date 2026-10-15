@@ -40,7 +40,7 @@ class MomentsTabPage extends StatelessWidget {
               Expanded(
                 child: BlocBuilder<MomentsBloc, MomentsState>(
                   builder: (context, state) {
-                    final bool showEmpty = state.activeTab != 'Moments' || state.posts.isEmpty;
+                    final bool showEmpty = state.posts.isEmpty;
 
                     if (showEmpty) {
                       return Center(
