@@ -6,6 +6,7 @@ import '../../../../core/widgets/custom_avatar.dart';
 import '../../../../core/widgets/royal_brand_logo.dart';
 import '../../../../core/widgets/gemgala_background.dart';
 import '../bloc/profile_bloc.dart';
+import '../bloc/profile_event.dart';
 import '../bloc/profile_state.dart';
 import '../../domain/entities/user_profile.dart';
 import '../widgets/wallet_card_widget.dart';
@@ -467,32 +468,183 @@ class ProfileTabPage extends StatelessWidget {
   void _showWithdrawModal(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: AppColors.dialogSurface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Withdraw Gems to Cash', style: AppTextStyles.titleBold.copyWith(color: AppColors.gemCyan)),
-            const SizedBox(height: 8),
-            Text(
-              'Minimum cashout: 1,000 Gems (\$1.00 USD). Supported via bKash, Nagad, USDT, Payoneer.',
-              style: AppTextStyles.caption.copyWith(color: Colors.white70),
+      builder: (ctx) => const _WithdrawalModalSheet(),
+    );
+  }
+}
+
+class _WithdrawalModalSheet extends StatefulWidget {
+  const _WithdrawalModalSheet();
+
+  @override
+  State<_WithdrawalModalSheet> createState() => _WithdrawalModalSheetState();
+}
+
+class _WithdrawalModalSheetState extends State<_WithdrawalModalSheet> {
+  String _selectedGateway = 'bKash';
+  final TextEditingController _accountController = TextEditingController();
+  final TextEditingController _gemsController = TextEditingController(text: '1000');
+
+  @override
+  void dispose() {
+    _accountController.dispose();
+    _gemsController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<ProfileBloc, ProfileState>(
+      builder: (context, state) {
+        final currentGems = state.profile.gemBalance;
+        final double gemsToWithdraw = double.tryParse(_gemsController.text) ?? 1000.0;
+        final double usdAmount = gemsToWithdraw / 1000.0;
+
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: const BoxDecoration(
+              color: AppColors.dialogSurface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.gemEmerald),
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Request Withdrawal', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Withdraw Gems to Cash', style: AppTextStyles.titleBold.copyWith(color: AppColors.gemCyan)),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white60, size: 20),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Your Balance: ${currentGems.toInt()} Gems (~ \$${(currentGems / 1000).toStringAsFixed(2)})',
+                  style: const TextStyle(color: AppColors.goldCoin, fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+
+                // Gateway Selector
+                const Text('Payout Method', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: ['bKash', 'Nagad', 'Rocket', 'USDT'].map((gateway) {
+                    final isSel = _selectedGateway == gateway;
+                    return ChoiceChip(
+                      label: Text(gateway),
+                      selected: isSel,
+                      selectedColor: AppColors.gemEmerald,
+                      backgroundColor: Colors.white10,
+                      labelStyle: TextStyle(
+                        color: isSel ? Colors.black : Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      onSelected: (val) => setState(() => _selectedGateway = gateway),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 14),
+
+                // Account Number Input
+                TextField(
+                  controller: _accountController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: '$_selectedGateway Account Number / Address',
+                    labelStyle: const TextStyle(color: Colors.white60),
+                    hintText: _selectedGateway == 'USDT' ? 'TRC20 Wallet Address' : '017XXXXXXXX',
+                    hintStyle: const TextStyle(color: Colors.white24),
+                    filled: true,
+                    fillColor: Colors.black26,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Gems Input
+                TextField(
+                  controller: _gemsController,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(color: Colors.white),
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    labelText: 'Gems Amount (Min: 1000)',
+                    labelStyle: const TextStyle(color: Colors.white60),
+                    helperText: 'You will receive: \$$usdAmount USD',
+                    helperStyle: const TextStyle(color: Color(0xFF10B981)),
+                    filled: true,
+                    fillColor: Colors.black26,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.gemEmerald,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    final gems = double.tryParse(_gemsController.text) ?? 0;
+                    if (gems < 1000) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Minimum withdrawal is 1,000 Gems (\$1.00 USD)')),
+                      );
+                      return;
+                    }
+
+                    if (_accountController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please enter your receiving account number')),
+                      );
+                      return;
+                    }
+
+                    if (currentGems < gems) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Insufficient gem balance. Earn gems in voice rooms!'),
+                          backgroundColor: Colors.redAccent,
+                        ),
+                      );
+                      return;
+                    }
+
+                    context.read<ProfileBloc>().add(
+                          WithdrawGemsEvent(
+                            gems,
+                            gateway: _selectedGateway,
+                            accountNumber: _accountController.text.trim(),
+                          ),
+                        );
+
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Withdrawal request for \$$usdAmount USD submitted to Supabase!'),
+                        backgroundColor: AppColors.gemEmerald,
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    'Submit Withdrawal Request',
+                    style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

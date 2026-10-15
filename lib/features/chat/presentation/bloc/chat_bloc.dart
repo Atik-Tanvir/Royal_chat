@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/config/supabase_config.dart';
 import '../../domain/entities/chat_item.dart';
 import '../../domain/entities/message_bubble.dart';
 import 'chat_event.dart';
@@ -6,74 +8,107 @@ import 'chat_state.dart';
 
 class ChatBloc extends Bloc<ChatEvent, ChatState> {
   ChatBloc() : super(_createInitialState()) {
-    on<LoadChatsEvent>((event, emit) {
-      emit(_createInitialState());
-    });
-
+    on<LoadChatsEvent>(_onLoadChats);
     on<SendDirectMessageEvent>(_onSendDirectMessage);
     on<MarkChatAsReadEvent>(_onMarkChatAsRead);
+
+    // Initial dynamic load from Supabase
+    add(LoadChatsEvent());
   }
 
   static ChatState _createInitialState() {
-    final chats = [
-      const ChatItem(
-        id: 'system_msg',
-        title: 'System Message',
-        subtitle: 'Dear user: 2,000 coins of Sign-in reward on 14/10/202...',
-        timestamp: '20:28',
-        unreadCount: 5,
-        type: ChatType.system,
-      ),
-      const ChatItem(
-        id: 'strangers_msg',
-        title: 'Stranger Messages',
-        subtitle: 'User31823345: Hello! Hope today\'s treating you kindly 🌷',
-        timestamp: 'Monday',
-        unreadCount: 1,
-        type: ChatType.strangers,
-      ),
-      const ChatItem(
-        id: 'user_yanboyy',
-        title: 'yanboyy',
-        subtitle: 'Thanks for the gift in the party room! 🚀',
-        timestamp: '19:40',
-        unreadCount: 0,
-        type: ChatType.direct,
-        avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
-      ),
-    ];
+    return const ChatState(chats: [], messagesMap: {});
+  }
 
-    final Map<String, List<MessageBubble>> messages = {
-      'system_msg': [
-        MessageBubble(
-          id: 'sys_1',
-          senderId: 'System',
-          text: 'Dear user: 2,000 coins of Sign-in reward on 14/10/2026 has been added to your wallet!',
-          timestamp: DateTime.now().subtract(const Duration(hours: 1)),
-          isMe: false,
-        ),
-      ],
-      'strangers_msg': [
-        MessageBubble(
-          id: 'str_1',
-          senderId: 'User31823345',
-          text: 'Hello! Hope today\'s treating you kindly 🌷',
-          timestamp: DateTime.now().subtract(const Duration(days: 2)),
-          isMe: false,
-        ),
-      ],
-      'user_yanboyy': [
-        MessageBubble(
-          id: 'yb_1',
-          senderId: 'yanboyy',
-          text: 'Thanks for the gift in the party room! 🚀',
-          timestamp: DateTime.now().subtract(const Duration(minutes: 30)),
-          isMe: false,
-        ),
-      ],
-    };
+  Future<void> _onLoadChats(LoadChatsEvent event, Emitter<ChatState> emit) async {
+    try {
+      // 1. Fetch live system messages from Supabase
+      final sysRes = await SupabaseConfig.client
+          .from('system_messages')
+          .select()
+          .order('created_at', ascending: false);
 
-    return ChatState(chats: chats, messagesMap: messages);
+      List<MessageBubble> sysBubbles = [];
+      String lastSysContent = 'Welcome to Royal Chat Live!';
+      int unreadCount = 0;
+
+      if (sysRes.isNotEmpty) {
+        sysBubbles = (sysRes as List).map((row) {
+          final isRead = row['is_read'] as bool? ?? false;
+          if (!isRead) unreadCount++;
+          return MessageBubble(
+            id: row['id']?.toString() ?? 'sys_${DateTime.now().millisecondsSinceEpoch}',
+            senderId: 'System',
+            text: '${row['title'] ?? 'Notification'}: ${row['content'] ?? ''}',
+            timestamp: DateTime.tryParse(row['created_at']?.toString() ?? '') ?? DateTime.now(),
+            isMe: false,
+          );
+        }).toList();
+
+        if (sysBubbles.isNotEmpty) {
+          lastSysContent = sysBubbles.first.text;
+        }
+      }
+
+      // 2. Fetch active community profiles for direct chats
+      final profilesRes = await SupabaseConfig.client
+          .from('profiles')
+          .select()
+          .limit(5);
+
+      final List<ChatItem> dynamicChats = [
+        ChatItem(
+          id: 'system_msg',
+          title: 'System Messages',
+          subtitle: lastSysContent,
+          timestamp: 'Just now',
+          unreadCount: unreadCount,
+          type: ChatType.system,
+        ),
+      ];
+
+      final Map<String, List<MessageBubble>> dynamicMessages = {
+        'system_msg': sysBubbles,
+      };
+
+      if (profilesRes.isNotEmpty) {
+        for (var p in profilesRes as List) {
+          final pid = p['id']?.toString() ?? '';
+          final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+          if (pid == currentUserId) continue;
+
+          final name = p['nickname']?.toString() ?? 'Royal Friend';
+          final avatar = p['avatar_url']?.toString() ?? '';
+          final chatId = 'user_$pid';
+
+          dynamicChats.add(
+            ChatItem(
+              id: chatId,
+              title: name,
+              subtitle: 'Active in Royal Chat Live',
+              timestamp: 'Online',
+              unreadCount: 0,
+              type: ChatType.direct,
+              avatarUrl: avatar.isNotEmpty ? avatar : null,
+            ),
+          );
+
+          dynamicMessages[chatId] = [
+            MessageBubble(
+              id: 'msg_welcome_$pid',
+              senderId: name,
+              text: 'Hey! Welcome to Royal Chat Live! Let\'s connect in party rooms 🎤✨',
+              timestamp: DateTime.now().subtract(const Duration(minutes: 15)),
+              isMe: false,
+            ),
+          ];
+        }
+      }
+
+      emit(state.copyWith(chats: dynamicChats, messagesMap: dynamicMessages));
+    } catch (e) {
+      debugPrint('ChatBloc Supabase load error: $e');
+    }
   }
 
   void _onSendDirectMessage(SendDirectMessageEvent event, Emitter<ChatState> emit) {

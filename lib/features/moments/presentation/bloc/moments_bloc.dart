@@ -8,9 +8,9 @@ import 'moments_state.dart';
 class MomentsBloc extends Bloc<MomentsEvent, MomentsState> {
   MomentsBloc()
       : super(
-          MomentsState(
+          const MomentsState(
             activeTab: 'Follow',
-            posts: _getFallbackPosts(),
+            posts: [],
           ),
         ) {
     on<LoadMomentsEvent>(_onLoadMoments);
@@ -21,10 +21,17 @@ class MomentsBloc extends Bloc<MomentsEvent, MomentsState> {
     });
 
     on<AddMomentPostEvent>((event, emit) async {
+      final user = SupabaseConfig.client.auth.currentUser;
+      final authorName = user?.userMetadata?['full_name'] as String? ??
+          user?.userMetadata?['name'] as String? ??
+          user?.email?.split('@').first ??
+          'RoyalUser';
+      final authorAvatar = user?.userMetadata?['avatar_url'] as String? ?? '';
+
       final newPost = MomentPost(
         id: 'post_${DateTime.now().millisecondsSinceEpoch}',
-        authorName: 'User30961573',
-        authorAvatar: '',
+        authorName: authorName,
+        authorAvatar: authorAvatar,
         countryFlag: '🇧🇩',
         authorLevel: 1,
         content: event.content,
@@ -38,10 +45,17 @@ class MomentsBloc extends Bloc<MomentsEvent, MomentsState> {
     });
 
     on<CreateMomentEvent>((event, emit) async {
+      final user = SupabaseConfig.client.auth.currentUser;
+      final authorName = user?.userMetadata?['full_name'] as String? ??
+          user?.userMetadata?['name'] as String? ??
+          user?.email?.split('@').first ??
+          'RoyalUser';
+      final authorAvatar = user?.userMetadata?['avatar_url'] as String? ?? '';
+
       final newPost = MomentPost(
         id: 'post_${DateTime.now().millisecondsSinceEpoch}',
-        authorName: 'User30961573',
-        authorAvatar: '',
+        authorName: authorName,
+        authorAvatar: authorAvatar,
         countryFlag: '🇧🇩',
         authorLevel: 1,
         content: event.content,
@@ -70,16 +84,21 @@ class MomentsBloc extends Bloc<MomentsEvent, MomentsState> {
       emit(state.copyWith(posts: updatedPosts));
     });
 
-    // Initial load from Supabase
+    // Initial dynamic load from Supabase
     add(LoadMomentsEvent());
   }
 
   Future<void> _onLoadMoments(LoadMomentsEvent event, Emitter<MomentsState> emit) async {
     try {
-      final response = await SupabaseConfig.client
-          .from('moments')
-          .select()
-          .order('created_at', ascending: false);
+      final response = state.activeTab == 'Hot'
+          ? await SupabaseConfig.client
+              .from('moments')
+              .select()
+              .order('likes_count', ascending: false)
+          : await SupabaseConfig.client
+              .from('moments')
+              .select()
+              .order('created_at', ascending: false);
 
       if (response.isNotEmpty) {
         final dynamicPosts = (response as List).map((row) {
@@ -103,7 +122,7 @@ class MomentsBloc extends Bloc<MomentsEvent, MomentsState> {
           );
         }).toList();
 
-        emit(state.copyWith(posts: [...dynamicPosts, ..._getFallbackPosts()]));
+        emit(state.copyWith(posts: dynamicPosts));
       }
     } catch (e) {
       debugPrint('MomentsBloc Supabase load error: $e');
@@ -112,9 +131,10 @@ class MomentsBloc extends Bloc<MomentsEvent, MomentsState> {
 
   Future<void> _saveToSupabase(MomentPost post) async {
     try {
+      final user = SupabaseConfig.client.auth.currentUser;
       await SupabaseConfig.client.from('moments').insert({
         'id': post.id,
-        'user_id': '30961573',
+        'user_id': user?.id ?? 'guest_${DateTime.now().millisecondsSinceEpoch}',
         'user_name': post.authorName,
         'user_avatar': post.authorAvatar,
         'content': post.content,
@@ -136,29 +156,5 @@ class MomentsBloc extends Bloc<MomentsEvent, MomentsState> {
     } catch (e) {
       debugPrint('MomentsBloc Supabase update likes error: $e');
     }
-  }
-
-  static List<MomentPost> _getFallbackPosts() {
-    return [
-      MomentPost(
-        id: 'post_kanchanjangha',
-        authorName: 'Mahbub Shihab',
-        authorAvatar: '',
-        countryFlag: '🇧🇩',
-        authorLevel: 3,
-        content: 'Kanchanjangha view From Tetulia ❤️\nMashaAllah ❤️🎀',
-        imageUrls: const [
-          'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=500',
-          'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=500',
-          'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=500',
-          'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=500',
-          'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=500',
-          'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=500',
-        ],
-        createdAt: DateTime.now().subtract(const Duration(minutes: 5)),
-        likesCount: 142,
-        commentsCount: 28,
-      ),
-    ];
   }
 }

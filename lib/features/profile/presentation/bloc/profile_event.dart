@@ -20,9 +20,30 @@ class RechargeCoinsEvent extends ProfileEvent {
 
 class WithdrawGemsEvent extends ProfileEvent {
   final double gems;
+  final String gateway;
+  final String accountNumber;
 
-  const WithdrawGemsEvent(this.gems);
+  const WithdrawGemsEvent(this.gems, {this.gateway = 'bKash', this.accountNumber = ''});
 
   @override
-  List<Object?> get props => [gems];
+  List<Object?> get props => [gems, gateway, accountNumber];
+}
+
+class UpdateProfileDetailsEvent extends ProfileEvent {
+  final String? nickname;
+  final String? avatarUrl;
+  final String? country;
+  final String? gender;
+  final int? age;
+
+  const UpdateProfileDetailsEvent({
+    this.nickname,
+    this.avatarUrl,
+    this.country,
+    this.gender,
+    this.age,
+  });
+
+  @override
+  List<Object?> get props => [nickname, avatarUrl, country, gender, age];
 }

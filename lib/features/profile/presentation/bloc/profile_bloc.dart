@@ -10,8 +10,9 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     on<LoadUserProfileEvent>(_onLoadUserProfile);
     on<RechargeCoinsEvent>(_onRechargeCoins);
     on<WithdrawGemsEvent>(_onWithdrawGems);
+    on<UpdateProfileDetailsEvent>(_onUpdateProfileDetails);
 
-    // Initial fetch from Supabase
+    // Initial dynamic fetch from Supabase
     add(LoadUserProfileEvent());
   }
 
@@ -20,19 +21,55 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     Emitter<ProfileState> emit,
   ) async {
     try {
+      final user = SupabaseConfig.client.auth.currentUser;
+      final currentUserId = user?.id ?? '30961573';
+      final defaultName = user?.userMetadata?['full_name'] as String? ??
+          user?.userMetadata?['name'] as String? ??
+          user?.email?.split('@').first ??
+          'RoyalUser';
+      final defaultAvatar = user?.userMetadata?['avatar_url'] as String? ?? '';
+
       // 1. Fetch Profile from Supabase
-      final profileRes = await SupabaseConfig.client
+      var profileRes = await SupabaseConfig.client
           .from('profiles')
           .select()
-          .eq('id', '30961573')
+          .eq('id', currentUserId)
           .maybeSingle();
+
+      // If profile doesn't exist yet, insert a dynamic new profile for the user
+      if (profileRes == null) {
+        await SupabaseConfig.client.from('profiles').upsert({
+          'id': currentUserId,
+          'nickname': defaultName,
+          'avatar_url': defaultAvatar,
+          'country': 'Bangladesh',
+          'country_flag': '🇧🇩',
+          'gender': '♂ 19',
+          'age': 19,
+          'level': 1,
+          'is_vip': true,
+          'coin_balance': 161480,
+          'gem_balance': 0,
+          'friends_count': 0,
+          'following_count': 0,
+          'fans_count': 0,
+          'visitors_count': 0,
+          'is_online': true,
+        });
+
+        profileRes = await SupabaseConfig.client
+            .from('profiles')
+            .select()
+            .eq('id', currentUserId)
+            .maybeSingle();
+      }
 
       UserProfile currentProfile = state.profile;
       if (profileRes != null) {
         currentProfile = UserProfile(
-          userId: profileRes['id'] as String? ?? '30961573',
-          nickname: profileRes['nickname'] as String? ?? 'User30961573',
-          avatarUrl: profileRes['avatar_url'] as String? ?? '',
+          userId: profileRes['id'] as String? ?? currentUserId,
+          nickname: profileRes['nickname'] as String? ?? defaultName,
+          avatarUrl: profileRes['avatar_url'] as String? ?? defaultAvatar,
           country: profileRes['country'] as String? ?? 'Bangladesh',
           gender: profileRes['gender'] as String? ?? '♂ 19',
           age: (profileRes['age'] as num?)?.toInt() ?? 19,
@@ -47,7 +84,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         );
       }
 
-      // 2. Fetch latest withdrawal ticker text
+      // 2. Fetch latest withdrawal ticker text from Supabase withdrawals table
       String ticker = state.recentWithdrawalText;
       final withdrawalRes = await SupabaseConfig.client
           .from('withdrawals')
@@ -57,9 +94,9 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
           .maybeSingle();
 
       if (withdrawalRes != null) {
-        final user = withdrawalRes['user_name'] ?? 'User';
+        final u = withdrawalRes['user_name'] ?? 'User';
         final amt = withdrawalRes['amount'] ?? '10.0';
-        ticker = '$user withdrew \$$amt';
+        ticker = '$u withdrew \$$amt';
       }
 
       emit(state.copyWith(profile: currentProfile, recentWithdrawalText: ticker));
@@ -129,13 +166,17 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
           'gem_balance': newGems,
         }).eq('id', state.profile.userId);
 
-        // Record withdrawal request in Supabase
+        // Record live withdrawal request in Supabase withdrawals table
+        final gatewayInfo = event.accountNumber.isNotEmpty
+            ? '${event.gateway} (${event.accountNumber})'
+            : event.gateway;
+
         await SupabaseConfig.client.from('withdrawals').insert({
           'id': 'WD-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
           'user_id': state.profile.userId,
           'user_name': state.profile.nickname,
           'user_avatar': state.profile.avatarUrl,
-          'gateway': 'bKash',
+          'gateway': gatewayInfo,
           'amount': event.gems / 1000,
           'gems': event.gems.toInt(),
           'status': 'Pending',
@@ -146,11 +187,60 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     }
   }
 
+  Future<void> _onUpdateProfileDetails(
+    UpdateProfileDetailsEvent event,
+    Emitter<ProfileState> emit,
+  ) async {
+    final updatedProfile = UserProfile(
+      userId: state.profile.userId,
+      nickname: event.nickname ?? state.profile.nickname,
+      avatarUrl: event.avatarUrl ?? state.profile.avatarUrl,
+      country: event.country ?? state.profile.country,
+      gender: event.gender ?? state.profile.gender,
+      age: event.age ?? state.profile.age,
+      level: state.profile.level,
+      isVip: state.profile.isVip,
+      friendsCount: state.profile.friendsCount,
+      followingCount: state.profile.followingCount,
+      fansCount: state.profile.fansCount,
+      visitorsCount: state.profile.visitorsCount,
+      gemBalance: state.profile.gemBalance,
+      coinBalance: state.profile.coinBalance,
+    );
+
+    emit(state.copyWith(profile: updatedProfile));
+
+    try {
+      final updates = <String, dynamic>{};
+      if (event.nickname != null) updates['nickname'] = event.nickname;
+      if (event.avatarUrl != null) updates['avatar_url'] = event.avatarUrl;
+      if (event.country != null) updates['country'] = event.country;
+      if (event.gender != null) updates['gender'] = event.gender;
+      if (event.age != null) updates['age'] = event.age;
+
+      if (updates.isNotEmpty) {
+        await SupabaseConfig.client
+            .from('profiles')
+            .update(updates)
+            .eq('id', state.profile.userId);
+      }
+    } catch (e) {
+      debugPrint('ProfileBloc Supabase update profile error: $e');
+    }
+  }
+
   static ProfileState _createInitialState() {
-    const profile = UserProfile(
-      userId: '30961573',
-      nickname: 'User30961573',
-      avatarUrl: '',
+    final user = SupabaseConfig.client.auth.currentUser;
+    final defaultName = user?.userMetadata?['full_name'] as String? ??
+        user?.userMetadata?['name'] as String? ??
+        user?.email?.split('@').first ??
+        'RoyalUser';
+    final defaultAvatar = user?.userMetadata?['avatar_url'] as String? ?? '';
+
+    final profile = UserProfile(
+      userId: user?.id ?? '30961573',
+      nickname: defaultName,
+      avatarUrl: defaultAvatar,
       country: 'Bangladesh',
       gender: '♂ 19',
       age: 19,
@@ -161,10 +251,10 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       fansCount: 0,
       visitorsCount: 0,
       gemBalance: 0.0,
-      coinBalance: 161480.0, // 161.48K
+      coinBalance: 161480.0,
     );
 
-    return const ProfileState(
+    return ProfileState(
       profile: profile,
       recentWithdrawalText: 'yanboyy withdrew \$10.0',
     );

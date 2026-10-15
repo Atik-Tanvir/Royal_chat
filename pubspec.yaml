@@ -19,6 +19,7 @@ dependencies:
   permission_handler: ^13.0.2
   dart_jsonwebtoken: ^3.4.1
   minio: ^3.5.8
+  image_picker: ^1.2.4
 
 dev_dependencies:
   flutter_test:

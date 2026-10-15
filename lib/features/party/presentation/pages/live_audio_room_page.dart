@@ -11,6 +11,7 @@ import '../widgets/user_profile_popover.dart';
 import '../../../profile/presentation/pages/coins_wallet_page.dart';
 import '../../../chat/presentation/pages/conversation_page.dart';
 import '../../../chat/domain/entities/chat_item.dart';
+import '../../../../core/config/supabase_config.dart';
 
 class LiveAudioRoomPage extends StatefulWidget {
   final PartyRoom room;
@@ -79,16 +80,62 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
     ];
 
     _initLiveKit();
+    _loadSeatsFromSupabase();
+  }
+
+  Future<void> _loadSeatsFromSupabase() async {
+    try {
+      final response = await SupabaseConfig.client
+          .from('room_seats')
+          .select()
+          .eq('room_id', widget.room.id)
+          .order('seat_index', ascending: true);
+
+      if (response.isNotEmpty && mounted) {
+        setState(() {
+          final currentUser = SupabaseConfig.client.auth.currentUser;
+          for (var row in response as List) {
+            final idx = (row['seat_index'] as num?)?.toInt() ?? 0;
+            if (idx >= 0 && idx < _seats.length) {
+              final uid = row['user_id']?.toString() ?? '';
+              final uName = row['user_name']?.toString() ?? '';
+              final uAvatar = row['avatar_url']?.toString() ?? '';
+              final isMuted = row['is_muted'] as bool? ?? false;
+
+              if (uid.isNotEmpty) {
+                _seats[idx]['name'] = uName;
+                _seats[idx]['avatar'] = uAvatar.isNotEmpty ? uAvatar : null;
+                _seats[idx]['isMuted'] = isMuted;
+
+                if (currentUser != null && uid == currentUser.id) {
+                  _mySeatIndex = idx;
+                  _isMicMuted = isMuted;
+                }
+              }
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading room seats from Supabase: $e');
+    }
   }
 
   Future<void> _initLiveKit() async {
     setState(() => _isConnectingAudio = true);
 
+    final user = SupabaseConfig.client.auth.currentUser;
+    final myId = user?.id ?? 'user_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+    final myName = user?.userMetadata?['full_name'] as String? ??
+        user?.userMetadata?['name'] as String? ??
+        user?.email?.split('@').first ??
+        'RoyalUser';
+
     _audioService.onActiveSpeakersChanged = (speakers) {
       if (!mounted) return;
       setState(() {
         if (_mySeatIndex != null) {
-          final isMeSpeaking = speakers.any((s) => s.identity == 'user_me');
+          final isMeSpeaking = speakers.any((s) => s.identity == myId);
           _seats[_mySeatIndex!]['isSpeaking'] = isMeSpeaking && !_isMicMuted;
         }
       });
@@ -107,8 +154,8 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
 
     final success = await _audioService.connect(
       roomId: 'room_${widget.room.id}',
-      userId: 'user_me',
-      userName: 'Me',
+      userId: myId,
+      userName: myName,
     );
 
     if (mounted) {
@@ -131,6 +178,14 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
     // Request microphone permission & enable mic via LiveKit WebRTC
     final micSuccess = await _audioService.enableMicrophone();
 
+    final user = SupabaseConfig.client.auth.currentUser;
+    final myName = user?.userMetadata?['full_name'] as String? ??
+        user?.userMetadata?['name'] as String? ??
+        user?.email?.split('@').first ??
+        'Me';
+    final myAvatar = user?.userMetadata?['avatar_url'] as String? ??
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
+
     if (mounted) {
       setState(() {
         // Clear previous seat if seated elsewhere
@@ -143,8 +198,8 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
 
         _mySeatIndex = index;
         _isMicMuted = !micSuccess;
-        _seats[index]['avatar'] = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb';
-        _seats[index]['name'] = 'Me';
+        _seats[index]['avatar'] = myAvatar;
+        _seats[index]['name'] = myName;
         _seats[index]['isSpeaking'] = micSuccess;
         _seats[index]['isMuted'] = !micSuccess;
       });
@@ -167,6 +222,20 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
         ),
       );
     }
+
+    try {
+      final myId = user?.id ?? 'guest_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      await SupabaseConfig.client.from('room_seats').upsert({
+        'room_id': widget.room.id,
+        'seat_index': index,
+        'user_id': myId,
+        'user_name': myName,
+        'avatar_url': myAvatar,
+        'is_muted': !micSuccess,
+      });
+    } catch (e) {
+      debugPrint('Error updating seat in Supabase: $e');
+    }
   }
 
   Future<void> _leaveSeat(int seatIndex) async {
@@ -186,6 +255,17 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
           duration: Duration(seconds: 1),
         ),
       );
+    }
+
+    try {
+      await SupabaseConfig.client.from('room_seats').update({
+        'user_id': '',
+        'user_name': '',
+        'avatar_url': '',
+        'is_muted': false,
+      }).match({'room_id': widget.room.id, 'seat_index': seatIndex});
+    } catch (e) {
+      debugPrint('Error clearing seat in Supabase: $e');
     }
   }
 
@@ -214,7 +294,7 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
     }
   }
 
-  void _triggerGift(String giftName, String icon, int cost) {
+  void _triggerGift(String giftName, String icon, int cost) async {
     setState(() {
       _activeGiftBanner = '✨ You gifted $icon $giftName to ${widget.room.hostName}! (+$cost Charm)';
       _messages.add({'sender': '👑 Me', 'text': 'sent $icon $giftName to Host'});
@@ -223,6 +303,20 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
     _giftBannerTimer = Timer(const Duration(seconds: 4), () {
       if (mounted) setState(() => _activeGiftBanner = null);
     });
+
+    try {
+      final user = SupabaseConfig.client.auth.currentUser;
+      final myId = user?.id ?? '30961573';
+      final profileRes = await SupabaseConfig.client.from('profiles').select('coin_balance').eq('id', myId).maybeSingle();
+      if (profileRes != null) {
+        final currentCoins = (profileRes['coin_balance'] as num?)?.toDouble() ?? 0.0;
+        if (currentCoins >= cost) {
+          await SupabaseConfig.client.from('profiles').update({'coin_balance': currentCoins - cost}).eq('id', myId);
+        }
+      }
+    } catch (e) {
+      debugPrint('Gift balance sync error: $e');
+    }
   }
 
   void _showMySeatOptions(int seatIndex) {
