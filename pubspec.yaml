@@ -1,5 +1,5 @@
 name: user_app
-description: "Gemgala Clone - Party, Chat & Games"
+description: "Royal Chat Live - Party, Voice Chat & Games"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -15,6 +15,9 @@ dependencies:
   intl: ^0.20.2
   cached_network_image: ^3.4.1
   supabase_flutter: ^2.18.3
+  livekit_client: ^2.13.1
+  permission_handler: ^13.0.2
+  dart_jsonwebtoken: ^3.4.1
 
 dev_dependencies:
   flutter_test:

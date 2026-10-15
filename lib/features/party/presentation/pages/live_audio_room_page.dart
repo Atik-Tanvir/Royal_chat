@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/services/livekit_audio_service.dart';
 import '../../../../core/widgets/custom_avatar.dart';
 import '../../../../core/widgets/royal_brand_logo.dart';
 import '../../domain/entities/party_room.dart';
@@ -21,7 +22,12 @@ class LiveAudioRoomPage extends StatefulWidget {
 }
 
 class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
-  bool _isMicMuted = false;
+  final LiveKitAudioService _audioService = LiveKitAudioService();
+  bool _isConnectingAudio = false;
+  bool _isAudioConnected = false;
+  int? _mySeatIndex;
+
+  bool _isMicMuted = true;
   bool _isFollowing = false;
   String? _activeGiftBanner;
   Timer? _giftBannerTimer;
@@ -30,7 +36,7 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
   late List<Map<String, dynamic>> _seats;
 
   final List<Map<String, String>> _messages = [
-    {'sender': 'System', 'text': 'Welcome to the party room! Keep it friendly and fun.'},
+    {'sender': 'System', 'text': 'Welcome to Royal Chat Live! Voice room is powered by WebRTC.'},
     {'sender': 'User31823345', 'text': 'Hello everyone! 🌷'},
     {'sender': 'yanboyy', 'text': 'Nice vibe here! 🎶'},
   ];
@@ -71,13 +77,141 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
       {'index': 6, 'name': null, 'avatar': null, 'isHost': false, 'isMuted': false, 'isSpeaking': false},
       {'index': 7, 'name': null, 'avatar': null, 'isHost': false, 'isMuted': false, 'isSpeaking': false},
     ];
+
+    _initLiveKit();
+  }
+
+  Future<void> _initLiveKit() async {
+    setState(() => _isConnectingAudio = true);
+
+    _audioService.onActiveSpeakersChanged = (speakers) {
+      if (!mounted) return;
+      setState(() {
+        if (_mySeatIndex != null) {
+          final isMeSpeaking = speakers.any((s) => s.identity == 'user_me');
+          _seats[_mySeatIndex!]['isSpeaking'] = isMeSpeaking && !_isMicMuted;
+        }
+      });
+    };
+
+    _audioService.onRoomDisconnected = () {
+      if (!mounted) return;
+      setState(() {
+        _isAudioConnected = false;
+        _isMicMuted = true;
+        if (_mySeatIndex != null) {
+          _seats[_mySeatIndex!]['isSpeaking'] = false;
+        }
+      });
+    };
+
+    final success = await _audioService.connect(
+      roomId: 'room_${widget.room.id}',
+      userId: 'user_me',
+      userName: 'Me',
+    );
+
+    if (mounted) {
+      setState(() {
+        _isConnectingAudio = false;
+        _isAudioConnected = success;
+      });
+    }
   }
 
   @override
   void dispose() {
+    _audioService.disconnect();
     _msgController.dispose();
     _giftBannerTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _takeSeat(int index) async {
+    // Request microphone permission & enable mic via LiveKit WebRTC
+    final micSuccess = await _audioService.enableMicrophone();
+
+    if (mounted) {
+      setState(() {
+        // Clear previous seat if seated elsewhere
+        if (_mySeatIndex != null && _mySeatIndex != index) {
+          _seats[_mySeatIndex!]['avatar'] = null;
+          _seats[_mySeatIndex!]['name'] = null;
+          _seats[_mySeatIndex!]['isSpeaking'] = false;
+          _seats[_mySeatIndex!]['isMuted'] = false;
+        }
+
+        _mySeatIndex = index;
+        _isMicMuted = !micSuccess;
+        _seats[index]['avatar'] = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb';
+        _seats[index]['name'] = 'Me';
+        _seats[index]['isSpeaking'] = micSuccess;
+        _seats[index]['isMuted'] = !micSuccess;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(micSuccess ? Icons.mic : Icons.mic_off, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                micSuccess
+                    ? 'Joined Mic Seat ${index + 1}! Live voice streaming 🎙️'
+                    : 'Joined Mic Seat ${index + 1}! (Mic permission required)',
+              ),
+            ],
+          ),
+          backgroundColor: micSuccess ? AppColors.gemEmerald : Colors.redAccent,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _leaveSeat(int seatIndex) async {
+    await _audioService.disableMicrophone();
+    if (mounted) {
+      setState(() {
+        _mySeatIndex = null;
+        _isMicMuted = true;
+        _seats[seatIndex]['avatar'] = null;
+        _seats[seatIndex]['name'] = null;
+        _seats[seatIndex]['isSpeaking'] = false;
+        _seats[seatIndex]['isMuted'] = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You left the mic seat.'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  Future<void> _toggleMic() async {
+    if (_mySeatIndex == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please tap an empty seat to activate your microphone! 🎤'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    final newMuted = !_isMicMuted;
+    await _audioService.setMicrophoneMuted(newMuted);
+
+    if (mounted) {
+      setState(() {
+        _isMicMuted = newMuted;
+        _seats[_mySeatIndex!]['isMuted'] = newMuted;
+        if (newMuted) {
+          _seats[_mySeatIndex!]['isSpeaking'] = false;
+        }
+      });
+    }
   }
 
   void _triggerGift(String giftName, String icon, int cost) {
@@ -124,16 +258,12 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
                 color: _isMicMuted ? AppColors.gemEmerald : Colors.redAccent,
               ),
               title: Text(
-                _isMicMuted ? 'Unmute Microphone' : 'Mute Microphone',
+                _isMicMuted ? 'Unmute Live Microphone' : 'Mute Live Microphone',
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
               ),
               onTap: () {
                 Navigator.pop(ctx);
-                setState(() {
-                  _isMicMuted = !_isMicMuted;
-                  _seats[seatIndex]['isMuted'] = _isMicMuted;
-                  _seats[seatIndex]['isSpeaking'] = !_isMicMuted;
-                });
+                _toggleMic();
               },
             ),
             ListTile(
@@ -144,18 +274,7 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
               ),
               onTap: () {
                 Navigator.pop(ctx);
-                setState(() {
-                  _seats[seatIndex]['avatar'] = null;
-                  _seats[seatIndex]['name'] = null;
-                  _seats[seatIndex]['isSpeaking'] = false;
-                  _seats[seatIndex]['isMuted'] = false;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('You left the mic seat.'),
-                    duration: Duration(seconds: 1),
-                  ),
-                );
+                _leaveSeat(seatIndex);
               },
             ),
             const SizedBox(height: 8),
@@ -310,9 +429,63 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
                     const RoyalBrandLogo(size: 18),
                   ],
                 ),
-                Text(
-                  'ID: ${widget.room.id} • ${widget.room.category}',
-                  style: AppTextStyles.caption.copyWith(color: Colors.white70),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'ID: ${widget.room.id}',
+                        style: AppTextStyles.caption.copyWith(color: Colors.white70),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _isAudioConnected
+                            ? AppColors.gemEmerald.withValues(alpha: 0.25)
+                            : (_isConnectingAudio
+                                ? Colors.amber.withValues(alpha: 0.2)
+                                : Colors.redAccent.withValues(alpha: 0.2)),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _isAudioConnected
+                              ? AppColors.gemEmerald
+                              : (_isConnectingAudio ? Colors.amber : Colors.redAccent),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _isAudioConnected
+                                  ? AppColors.gemEmerald
+                                  : (_isConnectingAudio ? Colors.amber : Colors.redAccent),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _isAudioConnected
+                                ? 'WebRTC Live'
+                                : (_isConnectingAudio ? 'Connecting...' : 'Offline'),
+                            style: TextStyle(
+                              color: _isAudioConnected
+                                  ? AppColors.gemEmerald
+                                  : (_isConnectingAudio ? Colors.amber : Colors.redAccent),
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -409,19 +582,7 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
                   },
                 );
               } else {
-                setState(() {
-                  seat['avatar'] = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb';
-                  seat['name'] = 'Me';
-                  seat['isSpeaking'] = true;
-                  seat['isMuted'] = false;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('You joined Mic Seat ${index + 1}! 🎤 (Tap seat to manage)'),
-                    backgroundColor: AppColors.gemEmerald,
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
+                _takeSeat(index);
               }
             },
             child: Column(
@@ -656,7 +817,7 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
           _buildCircleAction(
             icon: _isMicMuted ? Icons.mic_off : Icons.mic,
             color: _isMicMuted ? Colors.redAccent : AppColors.gemEmerald,
-            onTap: () => setState(() => _isMicMuted = !_isMicMuted),
+            onTap: _toggleMic,
           ),
           // Lucky Race Mini-game trigger
           _buildCircleAction(

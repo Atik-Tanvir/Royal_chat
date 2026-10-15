@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.gemgala.user_app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -20,7 +20,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.gemgala.user_app"
-        minSdk = flutter.minSdkVersion
+        minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
