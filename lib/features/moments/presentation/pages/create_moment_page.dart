@@ -1,9 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../../core/config/auth_session_manager.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/r2_storage_service.dart';
-import '../../../../core/config/supabase_config.dart';
 import '../bloc/moments_bloc.dart';
 import '../bloc/moments_event.dart';
 
@@ -38,12 +39,13 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
 
     String fullContent = text;
     if (_selectedTopic != null) fullContent += ' #$_selectedTopic';
-    if (_selectedLocation != null) fullContent += ' 📍$_selectedLocation';
 
     context.read<MomentsBloc>().add(
           CreateMomentEvent(
             content: fullContent,
             imageUrls: _attachedImages,
+            category: _selectedTopic ?? 'Moments',
+            location: _selectedLocation,
           ),
         );
 
@@ -57,13 +59,14 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
     Navigator.pop(context);
   }
 
-  Future<void> _pickAndUploadPhoto() async {
+  Future<void> _pickAndUploadPhoto(ImageSource source) async {
     try {
       final picker = ImagePicker();
       final pickedFile = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1600,
-        imageQuality: 85,
+        source: source,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 80,
       );
       if (pickedFile == null) return;
 
@@ -71,36 +74,101 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
 
       final bytes = await pickedFile.readAsBytes();
       final ext = pickedFile.name.contains('.') ? pickedFile.name.split('.').last : 'jpg';
-      final user = SupabaseConfig.client.auth.currentUser;
-      final userId = user?.id ?? 'user_${DateTime.now().millisecondsSinceEpoch}';
-      final r2Url = await R2StorageService.instance.uploadMomentPhoto(
+      final userId = AuthSessionManager.currentUserId ?? 'user_${DateTime.now().millisecondsSinceEpoch}';
+
+      final uploadedUrl = await R2StorageService.instance.uploadMomentPhoto(
         bytes: bytes,
         userId: userId,
         extension: ext,
       );
 
-      if (r2Url != null && mounted) {
+      if (uploadedUrl != null && mounted) {
         setState(() {
-          _attachedImages.add(r2Url);
+          _attachedImages.add(uploadedUrl);
           _isUploading = false;
         });
       } else if (mounted) {
         setState(() => _isUploading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Photo selected, uploaded via R2 Cloudflare.'),
-            backgroundColor: AppColors.gemEmerald,
-          ),
-        );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isUploading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Image selection note: $e')),
+          SnackBar(content: Text('Photo upload error: $e')),
         );
       }
     }
+  }
+
+  void _showMediaSourcePicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded, color: AppColors.gemEmerald),
+                title: const Text('Choose from Gallery', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndUploadPhoto(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt_rounded, color: AppColors.goldCoin),
+                title: const Text('Take a Photo', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndUploadPhoto(ImageSource.camera);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImagePreview(String urlOrDataUri) {
+    if (urlOrDataUri.startsWith('data:image')) {
+      try {
+        final commaIdx = urlOrDataUri.indexOf(',');
+        final base64String = commaIdx != -1 ? urlOrDataUri.substring(commaIdx + 1) : urlOrDataUri;
+        return Image.memory(
+          base64Decode(base64String),
+          fit: BoxFit.cover,
+          width: 90,
+          height: 90,
+        );
+      } catch (_) {
+        return Container(
+          width: 90,
+          height: 90,
+          color: const Color(0xFFE2E8F0),
+          child: const Icon(Icons.broken_image, color: Colors.grey),
+        );
+      }
+    }
+
+    return Image.network(
+      urlOrDataUri,
+      fit: BoxFit.cover,
+      width: 90,
+      height: 90,
+      errorBuilder: (_, __, ___) => Container(
+        width: 90,
+        height: 90,
+        color: const Color(0xFFE2E8F0),
+        child: const Icon(Icons.broken_image, color: Colors.grey),
+      ),
+    );
   }
 
   @override
@@ -114,12 +182,17 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
           icon: const Icon(Icons.close_rounded, color: Color(0xFF1E293B), size: 24),
           onPressed: () => Navigator.pop(context),
         ),
+        title: const Text(
+          'Create Moment',
+          style: TextStyle(color: Color(0xFF1E293B), fontWeight: FontWeight.bold, fontSize: 17),
+        ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: GestureDetector(
-              onTap: _isUploading ? null : _onPublish,
-              child: Container(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              onPressed: _isUploading ? null : _onPublish,
+              tooltip: 'Publish Moment',
+              icon: Container(
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
@@ -145,7 +218,7 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
             // Text Input
             TextField(
               controller: _textController,
-              maxLines: 8,
+              maxLines: 7,
               maxLength: 1000,
               decoration: const InputDecoration(
                 hintText: 'Share a moment with Royal Live community...',
@@ -156,20 +229,19 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
               onChanged: (_) => setState(() {}),
             ),
 
-            // Chips Row: # Topic, @ User, 📍 Location
-            Row(
+            // Chips Row: # Topic, @ Mention, 📍 Location
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 _buildActionChip(
                   iconText: '#',
                   label: _selectedTopic ?? 'Topic',
                   isSelected: _selectedTopic != null,
                   onTap: () {
-                    setState(() {
-                      _selectedTopic = _selectedTopic == null ? 'RoyalParty' : null;
-                    });
+                    _showTopicSelector();
                   },
                 ),
-                const SizedBox(width: 8),
                 _buildActionChip(
                   iconText: '@',
                   label: 'Mention',
@@ -180,48 +252,41 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
                     });
                   },
                 ),
-                const SizedBox(width: 8),
                 _buildActionChip(
                   iconText: '📍',
                   label: _selectedLocation ?? 'Location',
                   isSelected: _selectedLocation != null,
                   onTap: () {
-                    setState(() {
-                      _selectedLocation = _selectedLocation == null ? 'Dhaka' : null;
-                    });
+                    _showLocationSelector();
                   },
                 ),
-                const Spacer(),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
                 Text(
                   '${_textController.text.length}/1000',
                   style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 8),
             const Divider(color: Color(0xFFF1F5F9)),
             const SizedBox(height: 16),
 
-            // Upload Tiles Row (Image / Video)
+            // Attached Media Grid
             Wrap(
               spacing: 12,
               runSpacing: 12,
               children: [
-                // Render attached images
                 ..._attachedImages.asMap().entries.map((entry) {
                   return Stack(
                     children: [
-                      Container(
-                        width: 90,
-                        height: 90,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE2E8F0),
-                          borderRadius: BorderRadius.circular(12),
-                          image: DecorationImage(
-                            image: NetworkImage(entry.value),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: _buildImagePreview(entry.value),
                       ),
                       Positioned(
                         top: 4,
@@ -229,7 +294,7 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
                         child: GestureDetector(
                           onTap: () => setState(() => _attachedImages.removeAt(entry.key)),
                           child: Container(
-                            padding: const EdgeInsets.all(2),
+                            padding: const EdgeInsets.all(3),
                             decoration: const BoxDecoration(
                               color: Colors.black54,
                               shape: BoxShape.circle,
@@ -242,9 +307,9 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
                   );
                 }),
 
-                // Photo Picker Tile (Calls ImagePicker & R2 Storage)
+                // Add Photo Tile
                 GestureDetector(
-                  onTap: _isUploading ? null : _pickAndUploadPhoto,
+                  onTap: _isUploading ? null : _showMediaSourcePicker,
                   child: Container(
                     width: 90,
                     height: 90,
@@ -275,6 +340,98 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
           ],
         ),
       ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: ElevatedButton.icon(
+            onPressed: _isUploading ? null : _onPublish,
+            icon: _isUploading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                  )
+                : const Icon(Icons.send_rounded, size: 18),
+            label: Text(_isUploading ? 'Uploading...' : 'Publish Moment'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.gemEmerald,
+              foregroundColor: Colors.black,
+              minimumSize: const Size.fromHeight(50),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showTopicSelector() {
+    final topics = ['RoyalParty', 'VoiceRoom', 'LuckyRace', 'MusicLive', 'Hangout'];
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Select Topic', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: topics.map((t) {
+                  final isSel = _selectedTopic == t;
+                  return ChoiceChip(
+                    label: Text('#$t'),
+                    selected: isSel,
+                    onSelected: (val) {
+                      setState(() => _selectedTopic = val ? t : null);
+                      Navigator.pop(ctx);
+                    },
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showLocationSelector() {
+    final locations = ['Dhaka, Bangladesh', 'Chittagong, BD', 'Tokyo, Japan', 'Dubai, UAE', 'Manila, Philippines'];
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Select Location', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 12),
+              ...locations.map((loc) => ListTile(
+                    leading: const Icon(Icons.location_on_rounded, color: AppColors.gemEmerald),
+                    title: Text(loc),
+                    onTap: () {
+                      setState(() => _selectedLocation = loc);
+                      Navigator.pop(ctx);
+                    },
+                  )),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -287,7 +444,7 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.gemEmerald.withValues(alpha: 0.15) : const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(16),

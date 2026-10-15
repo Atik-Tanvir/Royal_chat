@@ -1,18 +1,32 @@
+import 'dart:convert';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
-import '../../../../core/widgets/royal_brand_logo.dart';
-import '../../../../core/widgets/gemgala_background.dart';
 import '../../../../core/widgets/custom_avatar.dart';
+import '../../../../core/widgets/gemgala_background.dart';
+import '../../../../core/widgets/royal_brand_logo.dart';
+import '../../domain/entities/moment_post.dart';
 import '../bloc/moments_bloc.dart';
 import '../bloc/moments_event.dart';
 import '../bloc/moments_state.dart';
-import '../../domain/entities/moment_post.dart';
+import '../widgets/moment_comments_sheet.dart';
 import 'create_moment_page.dart';
 
 class MomentsTabPage extends StatelessWidget {
   const MomentsTabPage({super.key});
+
+  static String _formatTimeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inSeconds < 60) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return DateFormat('MMM d').format(dt);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +44,11 @@ class MomentsTabPage extends StatelessWidget {
                     const Spacer(),
                     IconButton(
                       icon: const Icon(Icons.mail_rounded, color: AppColors.goldCoin),
-                      onPressed: () {},
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('No new direct messages.')),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -40,9 +58,13 @@ class MomentsTabPage extends StatelessWidget {
               Expanded(
                 child: BlocBuilder<MomentsBloc, MomentsState>(
                   builder: (context, state) {
-                    final bool showEmpty = state.posts.isEmpty;
+                    if (state.isLoading && state.posts.isEmpty) {
+                      return const Center(
+                        child: CircularProgressIndicator(color: AppColors.gemEmerald),
+                      );
+                    }
 
-                    if (showEmpty) {
+                    if (state.posts.isEmpty) {
                       return Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -68,7 +90,10 @@ class MomentsTabPage extends StatelessWidget {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => const CreateMomentPage(),
+                                    builder: (_) => BlocProvider.value(
+                                      value: context.read<MomentsBloc>(),
+                                      child: const CreateMomentPage(),
+                                    ),
                                   ),
                                 );
                               },
@@ -89,15 +114,21 @@ class MomentsTabPage extends StatelessWidget {
                       );
                     }
 
-                    // Rich Moments Feed (Matching Screenshot 5)
-                    return ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
-                      itemCount: state.posts.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 14),
-                      itemBuilder: (context, i) {
-                        final post = state.posts[i];
-                        return _buildMomentCard(context, post);
+                    return RefreshIndicator(
+                      color: AppColors.gemEmerald,
+                      onRefresh: () async {
+                        context.read<MomentsBloc>().add(LoadMomentsEvent());
                       },
+                      child: ListView.separated(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
+                        itemCount: state.posts.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 14),
+                        itemBuilder: (context, i) {
+                          final post = state.posts[i];
+                          return _buildMomentCard(context, post);
+                        },
+                      ),
                     );
                   },
                 ),
@@ -105,14 +136,15 @@ class MomentsTabPage extends StatelessWidget {
             ],
           ),
 
-          // Floating Action Button matching Screenshot 2/3/8: Orange circle with paper plane icon
+          // Floating Action Button
           Positioned(
             right: 20,
             bottom: 24,
             child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: () {
-                Navigator.push(
-                  context,
+                debugPrint('[MomentsTabPage] FAB tapped!');
+                Navigator.of(context, rootNavigator: true).push(
                   MaterialPageRoute(
                     builder: (_) => BlocProvider.value(
                       value: context.read<MomentsBloc>(),
@@ -122,8 +154,8 @@ class MomentsTabPage extends StatelessWidget {
                 );
               },
               child: Container(
-                width: 56,
-                height: 56,
+                width: 60,
+                height: 60,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
@@ -133,7 +165,7 @@ class MomentsTabPage extends StatelessWidget {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.accentOrange.withOpacity(0.5),
+                      color: AppColors.accentOrange.withValues(alpha: 0.5),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -157,7 +189,7 @@ class MomentsTabPage extends StatelessWidget {
   Widget _buildSubTabs(BuildContext context) {
     return BlocBuilder<MomentsBloc, MomentsState>(
       builder: (context, state) {
-        final tabs = ['Follow', 'Moments', 'Video'];
+        final tabs = ['Moments', 'Follow', 'Video'];
         return Row(
           children: tabs.map((tab) {
             final isSelected = state.activeTab == tab;
@@ -186,7 +218,7 @@ class MomentsTabPage extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
+            color: Colors.black.withValues(alpha: 0.12),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -200,32 +232,59 @@ class MomentsTabPage extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
             child: Row(
               children: [
-                const CustomAvatar(radius: 20),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      post.authorName,
-                      style: const TextStyle(
-                        color: Color(0xFF1E293B),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        const Text('5m • ', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                        const Icon(Icons.public, color: Color(0xFF94A3B8), size: 12),
-                        const SizedBox(width: 6),
-                        Text(post.countryFlag, style: const TextStyle(fontSize: 12)),
-                      ],
-                    ),
-                  ],
+                CustomAvatar(
+                  imageUrl: post.authorAvatar,
+                  countryFlag: post.countryFlag,
+                  radius: 20,
                 ),
-                const Spacer(),
-                const Icon(Icons.more_horiz_rounded, color: Color(0xFF94A3B8)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        post.authorName,
+                        style: const TextStyle(
+                          color: Color(0xFF1E293B),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Text(
+                            '${_formatTimeAgo(post.createdAt)} • ',
+                            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                          ),
+                          if (post.location != null && post.location!.isNotEmpty) ...[
+                            const Icon(Icons.location_on_rounded, color: AppColors.gemEmerald, size: 12),
+                            const SizedBox(width: 2),
+                            Flexible(
+                              child: Text(
+                                post.location!,
+                                style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ] else ...[
+                            const Icon(Icons.public, color: Color(0xFF94A3B8), size: 12),
+                            const SizedBox(width: 4),
+                            Text(post.countryFlag, style: const TextStyle(fontSize: 12)),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.more_horiz_rounded, color: Color(0xFF94A3B8)),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Post options')),
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -244,11 +303,11 @@ class MomentsTabPage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
 
-          // 2x2 Photo Grid (Screenshot 5)
+          // Photos Grid (Handles R2 CDN URLs and Data URIs)
           if (post.imageUrls.isNotEmpty)
-            _buildPhotoGrid(post.imageUrls),
+            _buildPhotoGrid(context, post.imageUrls),
 
-          // Bottom Action Bar: Like & Comment
+          // Bottom Action Bar: Like, Comment, Share
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             child: Row(
@@ -260,7 +319,7 @@ class MomentsTabPage extends StatelessWidget {
                   child: Row(
                     children: [
                       Icon(
-                        post.isLiked ? Icons.favorite : Icons.favorite_border_rounded,
+                        post.isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                         color: post.isLiked ? const Color(0xFFE11D48) : const Color(0xFF64748B),
                         size: 20,
                       ),
@@ -277,22 +336,38 @@ class MomentsTabPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 24),
-                Row(
-                  children: [
-                    const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF64748B), size: 19),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${post.commentsCount}',
-                      style: const TextStyle(
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
+                GestureDetector(
+                  onTap: () {
+                    MomentCommentsSheet.show(context, post);
+                  },
+                  child: Row(
+                    children: [
+                      const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF64748B), size: 19),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${post.commentsCount}',
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const Spacer(),
-                const Icon(Icons.share_outlined, color: Color(0xFF64748B), size: 20),
+                GestureDetector(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: 'Check out this moment on Royal Live: ${post.content}'));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('✨ Moment copied to clipboard!'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  child: const Icon(Icons.share_outlined, color: Color(0xFF64748B), size: 20),
+                ),
               ],
             ),
           ),
@@ -301,7 +376,7 @@ class MomentsTabPage extends StatelessWidget {
     );
   }
 
-  Widget _buildPhotoGrid(List<String> images) {
+  Widget _buildPhotoGrid(BuildContext context, List<String> images) {
     final count = images.length > 4 ? 4 : images.length;
     final int extraCount = images.length - 4;
 
@@ -322,35 +397,108 @@ class MomentsTabPage extends StatelessWidget {
             ),
             itemBuilder: (context, idx) {
               final bool isLastWithMore = idx == 3 && extraCount > 0;
+              final imageSrc = images[idx];
 
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(
-                    images[idx],
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: const Color(0xFFE2E8F0),
-                      child: const Icon(Icons.image, color: Colors.grey),
-                    ),
-                  ),
-                  if (isLastWithMore)
-                    Container(
-                      color: Colors.black.withOpacity(0.55),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '+$extraCount',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
+              return GestureDetector(
+                onTap: () => _openImagePreview(context, imageSrc),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _renderImage(imageSrc),
+                    if (isLastWithMore)
+                      Container(
+                        color: Colors.black.withValues(alpha: 0.55),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '+$extraCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               );
             },
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _renderImage(String src) {
+    if (src.startsWith('data:image')) {
+      try {
+        final commaIdx = src.indexOf(',');
+        final base64String = commaIdx != -1 ? src.substring(commaIdx + 1) : src;
+        return Image.memory(
+          base64Decode(base64String),
+          fit: BoxFit.cover,
+        );
+      } catch (_) {
+        return Container(
+          color: const Color(0xFFE2E8F0),
+          child: const Icon(Icons.broken_image, color: Colors.grey),
+        );
+      }
+    }
+
+    return CachedNetworkImage(
+      imageUrl: src,
+      fit: BoxFit.cover,
+      placeholder: (context, url) => Container(
+        color: const Color(0xFFE2E8F0),
+        child: const Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.gemEmerald),
+          ),
+        ),
+      ),
+      errorWidget: (_, __, ___) => Container(
+        color: const Color(0xFFE2E8F0),
+        child: const Icon(Icons.image, color: Colors.grey),
+      ),
+    );
+  }
+
+  void _openImagePreview(BuildContext context, String src) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            InteractiveViewer(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: src.startsWith('data:image')
+                    ? Image.memory(base64Decode(src.split(',').last), fit: BoxFit.contain)
+                    : CachedNetworkImage(imageUrl: src, fit: BoxFit.contain),
+              ),
+            ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: GestureDetector(
+                onTap: () => Navigator.pop(ctx),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close_rounded, color: Colors.white, size: 24),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

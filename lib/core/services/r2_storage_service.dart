@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:minio/minio.dart';
 import '../config/r2_config.dart';
@@ -30,8 +31,9 @@ class R2StorageService {
     final cleanPath = path.startsWith('/') ? path.substring(1) : path;
 
     if (!R2Config.isConfigured || _client == null) {
-      debugPrint('[R2StorageService] R2 credentials not configured. Using public URL placeholder: ${R2Config.getPublicUrl(cleanPath)}');
-      return R2Config.getPublicUrl(cleanPath);
+      debugPrint('[R2StorageService] R2 credentials not configured. Returning data URI for local/remote rendering.');
+      final b64 = base64Encode(bytes);
+      return 'data:$contentType;base64,$b64';
     }
 
     try {
@@ -45,11 +47,12 @@ class R2StorageService {
       );
 
       final publicUrl = R2Config.getPublicUrl(cleanPath);
-      debugPrint('[R2StorageService] Uploaded successfully: $publicUrl');
+      debugPrint('[R2StorageService] Uploaded successfully to R2: $publicUrl');
       return publicUrl;
     } catch (e) {
-      debugPrint('[R2StorageService] Upload error: $e');
-      return null;
+      debugPrint('[R2StorageService] Upload error: $e, falling back to data URI');
+      final b64 = base64Encode(bytes);
+      return 'data:$contentType;base64,$b64';
     }
   }
 

@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 
 class MomentPost extends Equatable {
   final String id;
+  final String authorId;
   final String authorName;
   final String authorAvatar;
   final String countryFlag;
@@ -12,9 +13,12 @@ class MomentPost extends Equatable {
   final int likesCount;
   final int commentsCount;
   final bool isLiked;
+  final String category;
+  final String? location;
 
   const MomentPost({
     required this.id,
+    this.authorId = '',
     required this.authorName,
     required this.authorAvatar,
     required this.countryFlag,
@@ -25,14 +29,18 @@ class MomentPost extends Equatable {
     this.likesCount = 0,
     this.commentsCount = 0,
     this.isLiked = false,
+    this.category = 'Moments',
+    this.location,
   });
 
   MomentPost copyWith({
     int? likesCount,
+    int? commentsCount,
     bool? isLiked,
   }) {
     return MomentPost(
       id: id,
+      authorId: authorId,
       authorName: authorName,
       authorAvatar: authorAvatar,
       countryFlag: countryFlag,
@@ -41,14 +49,17 @@ class MomentPost extends Equatable {
       imageUrls: imageUrls,
       createdAt: createdAt,
       likesCount: likesCount ?? this.likesCount,
-      commentsCount: commentsCount,
+      commentsCount: commentsCount ?? this.commentsCount,
       isLiked: isLiked ?? this.isLiked,
+      category: category,
+      location: location,
     );
   }
 
   @override
   List<Object?> get props => [
         id,
+        authorId,
         authorName,
         authorAvatar,
         countryFlag,
@@ -59,5 +70,7 @@ class MomentPost extends Equatable {
         likesCount,
         commentsCount,
         isLiked,
+        category,
+        location,
       ];
 }
