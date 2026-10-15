@@ -365,11 +365,10 @@ class ProfileTabPage extends StatelessWidget {
   }
 
   Widget _buildMenuList(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.black12,
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return Material(
+      color: Colors.black12,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
           _buildMenuItem(

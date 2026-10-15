@@ -219,48 +219,53 @@ class CoinsWalletPage extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        leading: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFF9E6),
-            borderRadius: BorderRadius.circular(12),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          leading: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF9E6),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: Text(iconEmoji, style: const TextStyle(fontSize: 22)),
           ),
-          alignment: Alignment.center,
-          child: Text(iconEmoji, style: const TextStyle(fontSize: 22)),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            color: Color(0xFF1E293B),
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
+          title: Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF1E293B),
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+            ),
           ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: const TextStyle(
-            color: Color(0xFF64748B),
-            fontSize: 12,
+          subtitle: Text(
+            subtitle,
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 12,
+            ),
           ),
+          trailing: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.monetization_on, color: AppColors.goldCoin, size: 24),
+              SizedBox(width: 4),
+              Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
+            ],
+          ),
+          onTap: onTap,
         ),
-        trailing: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.monetization_on, color: AppColors.goldCoin, size: 24),
-            SizedBox(width: 4),
-            Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
-          ],
-        ),
-        onTap: onTap,
       ),
     );
   }

@@ -12,9 +12,11 @@ import '../../../profile/presentation/pages/coins_wallet_page.dart';
 import '../../../chat/presentation/pages/conversation_page.dart';
 import '../../../chat/domain/entities/chat_item.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/config/auth_session_manager.dart';
 import '../../../../core/config/supabase_config.dart';
 import '../../../profile/presentation/bloc/profile_bloc.dart';
+import '../../../profile/presentation/bloc/profile_event.dart';
 import '../../../profile/presentation/bloc/profile_state.dart';
 
 class LiveAudioRoomPage extends StatefulWidget {
@@ -39,13 +41,9 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
 
   // 8 seats: Index 0 is Host, Indices 1-7 are Guests
   late List<Map<String, dynamic>> _seats;
+  RealtimeChannel? _roomChannel;
 
-  final List<Map<String, String>> _messages = [
-    {'sender': 'System', 'text': 'Welcome to Royal Chat Live! Voice room is powered by WebRTC.'},
-    {'sender': 'User31823345', 'text': 'Hello everyone! 🌷'},
-    {'sender': 'yanboyy', 'text': 'Nice vibe here! 🎶'},
-  ];
-
+  final List<Map<String, String>> _messages = [];
   final TextEditingController _msgController = TextEditingController();
 
   @override
@@ -54,37 +52,33 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
     _seats = [
       {
         'index': 0,
+        'userId': null,
         'name': widget.room.hostName,
         'avatar': widget.room.hostAvatar,
         'isHost': true,
         'isMuted': false,
-        'isSpeaking': true,
-      },
-      {
-        'index': 1,
-        'name': 'Alex',
-        'avatar': widget.room.seatedAvatars.isNotEmpty ? widget.room.seatedAvatars[0] : null,
-        'isHost': false,
-        'isMuted': false,
         'isSpeaking': false,
       },
-      {
-        'index': 2,
-        'name': 'Sara',
-        'avatar': widget.room.seatedAvatars.length > 1 ? widget.room.seatedAvatars[1] : null,
-        'isHost': false,
-        'isMuted': true,
-        'isSpeaking': false,
-      },
-      {'index': 3, 'name': null, 'avatar': null, 'isHost': false, 'isMuted': false, 'isSpeaking': false},
-      {'index': 4, 'name': null, 'avatar': null, 'isHost': false, 'isMuted': false, 'isSpeaking': false},
-      {'index': 5, 'name': null, 'avatar': null, 'isHost': false, 'isMuted': false, 'isSpeaking': false},
-      {'index': 6, 'name': null, 'avatar': null, 'isHost': false, 'isMuted': false, 'isSpeaking': false},
-      {'index': 7, 'name': null, 'avatar': null, 'isHost': false, 'isMuted': false, 'isSpeaking': false},
+      for (int i = 1; i < 8; i++)
+        {
+          'index': i,
+          'userId': null,
+          'name': null,
+          'avatar': null,
+          'isHost': false,
+          'isMuted': false,
+          'isSpeaking': false,
+        },
     ];
+
+    _messages.add({
+      'sender': 'System',
+      'text': 'Welcome to ${widget.room.title}! Live WebRTC audio connected.',
+    });
 
     _initLiveKit();
     _loadSeatsFromSupabase();
+    _initRealtimeSubscription();
   }
 
   Future<void> _loadSeatsFromSupabase() async {
@@ -107,8 +101,9 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
               final isMuted = row['is_muted'] as bool? ?? false;
 
               if (uid.isNotEmpty) {
-                _seats[idx]['name'] = uName;
-                _seats[idx]['avatar'] = uAvatar.isNotEmpty ? uAvatar : null;
+                _seats[idx]['userId'] = uid;
+                _seats[idx]['name'] = uName.isNotEmpty ? uName : (idx == 0 ? widget.room.hostName : 'Guest');
+                _seats[idx]['avatar'] = uAvatar.isNotEmpty ? uAvatar : (idx == 0 ? widget.room.hostAvatar : null);
                 _seats[idx]['isMuted'] = isMuted;
 
                 if (currentUserId != null && uid == currentUserId) {
@@ -121,26 +116,126 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
         });
       }
     } catch (e) {
-      debugPrint('Error loading room seats from Supabase: $e');
+      debugPrint('[LiveAudioRoom] Error loading room seats: $e');
     }
+  }
+
+  void _initRealtimeSubscription() {
+    try {
+      _roomChannel = SupabaseConfig.client
+          .channel('room_${widget.room.id}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'room_seats',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'room_id',
+              value: widget.room.id,
+            ),
+            callback: (payload) {
+              _handleSeatChange(payload);
+            },
+          )
+          .onBroadcast(
+            event: 'chat',
+            callback: (payload) {
+              if (!mounted) return;
+              final sender = payload['sender']?.toString() ?? 'User';
+              final text = payload['text']?.toString() ?? '';
+              if (text.isNotEmpty) {
+                setState(() {
+                  _messages.add({'sender': sender, 'text': text});
+                });
+              }
+            },
+          )
+          .onBroadcast(
+            event: 'gift',
+            callback: (payload) {
+              if (!mounted) return;
+              final sender = payload['sender']?.toString() ?? 'User';
+              final giftName = payload['giftName']?.toString() ?? 'Gift';
+              final giftIcon = payload['giftIcon']?.toString() ?? '🎁';
+              final cost = (payload['cost'] as num?)?.toInt() ?? 0;
+              _displayGiftBanner('✨ $sender gifted $giftIcon $giftName to Host! (+$cost Charm)');
+              setState(() {
+                _messages.add({
+                  'sender': '👑 $sender',
+                  'text': 'sent $giftIcon $giftName to Host',
+                });
+              });
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('[LiveAudioRoom] Realtime subscription error: $e');
+    }
+  }
+
+  void _handleSeatChange(PostgresChangePayload payload) {
+    if (!mounted) return;
+    final newRecord = payload.newRecord;
+    if (newRecord.isEmpty) return;
+
+    final idx = (newRecord['seat_index'] as num?)?.toInt();
+    if (idx == null || idx < 0 || idx >= _seats.length) return;
+
+    final uid = newRecord['user_id']?.toString() ?? '';
+    final uName = newRecord['user_name']?.toString() ?? '';
+    final uAvatar = newRecord['avatar_url']?.toString() ?? '';
+    final isMuted = newRecord['is_muted'] as bool? ?? false;
+    final currentUserId = AuthSessionManager.currentUserId;
+
+    setState(() {
+      if (uid.isNotEmpty) {
+        _seats[idx]['userId'] = uid;
+        _seats[idx]['name'] = uName;
+        _seats[idx]['avatar'] = uAvatar.isNotEmpty ? uAvatar : null;
+        _seats[idx]['isMuted'] = isMuted;
+
+        if (currentUserId != null && uid == currentUserId) {
+          _mySeatIndex = idx;
+          _isMicMuted = isMuted;
+        }
+      } else {
+        _seats[idx]['userId'] = null;
+        _seats[idx]['name'] = null;
+        _seats[idx]['avatar'] = null;
+        _seats[idx]['isMuted'] = false;
+        _seats[idx]['isSpeaking'] = false;
+
+        if (_mySeatIndex == idx) {
+          _mySeatIndex = null;
+          _isMicMuted = true;
+        }
+      }
+    });
   }
 
   Future<void> _initLiveKit() async {
     setState(() => _isConnectingAudio = true);
 
-    final user = SupabaseConfig.client.auth.currentUser;
-    final myId = AuthSessionManager.currentUserId ?? 'user_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-    final myName = user?.userMetadata?['full_name'] as String? ??
-        user?.userMetadata?['name'] as String? ??
-        user?.email?.split('@').first ??
-        myId;
+    final currentUserId = AuthSessionManager.currentUserId ??
+        'guest_${DateTime.now().millisecondsSinceEpoch}';
+    final profile = context.read<ProfileBloc>().state.profile;
+    final myName = profile.nickname.isNotEmpty ? profile.nickname : 'User';
 
     _audioService.onActiveSpeakersChanged = (speakers) {
       if (!mounted) return;
       setState(() {
-        if (_mySeatIndex != null) {
-          final isMeSpeaking = speakers.any((s) => s.identity == myId);
-          _seats[_mySeatIndex!]['isSpeaking'] = isMeSpeaking && !_isMicMuted;
+        for (var seat in _seats) {
+          final sUid = seat['userId']?.toString();
+          final sName = seat['name']?.toString();
+          if (seat['avatar'] != null && (sUid != null || sName != null)) {
+            final isSpeaking = speakers.any((s) =>
+                (sUid != null && s.identity == sUid) ||
+                (sName != null && s.name == sName) ||
+                (s.identity == currentUserId && seat['index'] == _mySeatIndex));
+            seat['isSpeaking'] = isSpeaking && !(seat['isMuted'] as bool);
+          } else {
+            seat['isSpeaking'] = false;
+          }
         }
       });
     };
@@ -158,7 +253,7 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
 
     final success = await _audioService.connect(
       roomId: 'room_${widget.room.id}',
-      userId: myId,
+      userId: currentUserId,
       userName: myName,
     );
 
@@ -173,35 +268,49 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
   @override
   void dispose() {
     _audioService.disconnect();
+    if (_roomChannel != null) {
+      SupabaseConfig.client.removeChannel(_roomChannel!);
+      _roomChannel = null;
+    }
     _msgController.dispose();
     _giftBannerTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _takeSeat(int index) async {
+    final currentUserId = AuthSessionManager.currentUserId;
+    if (currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to take a mic seat!')),
+      );
+      return;
+    }
+
+    final profile = context.read<ProfileBloc>().state.profile;
+    final myName = profile.nickname.isNotEmpty ? profile.nickname : 'User';
+    final myAvatar = profile.avatarUrl.isNotEmpty
+        ? profile.avatarUrl
+        : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
+
     // Request microphone permission & enable mic via LiveKit WebRTC
     final micSuccess = await _audioService.enableMicrophone();
 
-    final user = SupabaseConfig.client.auth.currentUser;
-    final myName = user?.userMetadata?['full_name'] as String? ??
-        user?.userMetadata?['name'] as String? ??
-        user?.email?.split('@').first ??
-        'Me';
-    final myAvatar = user?.userMetadata?['avatar_url'] as String? ??
-        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
+    final prevSeatIndex = _mySeatIndex;
 
     if (mounted) {
       setState(() {
         // Clear previous seat if seated elsewhere
-        if (_mySeatIndex != null && _mySeatIndex != index) {
-          _seats[_mySeatIndex!]['avatar'] = null;
-          _seats[_mySeatIndex!]['name'] = null;
-          _seats[_mySeatIndex!]['isSpeaking'] = false;
-          _seats[_mySeatIndex!]['isMuted'] = false;
+        if (prevSeatIndex != null && prevSeatIndex != index) {
+          _seats[prevSeatIndex]['userId'] = null;
+          _seats[prevSeatIndex]['avatar'] = null;
+          _seats[prevSeatIndex]['name'] = null;
+          _seats[prevSeatIndex]['isSpeaking'] = false;
+          _seats[prevSeatIndex]['isMuted'] = false;
         }
 
         _mySeatIndex = index;
         _isMicMuted = !micSuccess;
+        _seats[index]['userId'] = currentUserId;
         _seats[index]['avatar'] = myAvatar;
         _seats[index]['name'] = myName;
         _seats[index]['isSpeaking'] = micSuccess;
@@ -228,17 +337,36 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
     }
 
     try {
-      final myId = user?.id ?? 'guest_${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-      await SupabaseConfig.client.from('room_seats').upsert({
-        'room_id': widget.room.id,
-        'seat_index': index,
-        'user_id': myId,
+      if (prevSeatIndex != null && prevSeatIndex != index) {
+        // Clear old seat in Supabase
+        await SupabaseConfig.client.from('room_seats').update({
+          'user_id': null,
+          'user_name': null,
+          'avatar_url': null,
+          'is_muted': false,
+        }).match({'room_id': widget.room.id, 'seat_index': prevSeatIndex});
+      }
+
+      // Update seat in Supabase
+      final updated = await SupabaseConfig.client.from('room_seats').update({
+        'user_id': currentUserId,
         'user_name': myName,
         'avatar_url': myAvatar,
         'is_muted': !micSuccess,
-      });
+      }).match({'room_id': widget.room.id, 'seat_index': index}).select();
+
+      if (updated.isEmpty) {
+        await SupabaseConfig.client.from('room_seats').insert({
+          'room_id': widget.room.id,
+          'seat_index': index,
+          'user_id': currentUserId,
+          'user_name': myName,
+          'avatar_url': myAvatar,
+          'is_muted': !micSuccess,
+        });
+      }
     } catch (e) {
-      debugPrint('Error updating seat in Supabase: $e');
+      debugPrint('[LiveAudioRoom] Error updating seat in Supabase: $e');
     }
   }
 
@@ -248,6 +376,7 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
       setState(() {
         _mySeatIndex = null;
         _isMicMuted = true;
+        _seats[seatIndex]['userId'] = null;
         _seats[seatIndex]['avatar'] = null;
         _seats[seatIndex]['name'] = null;
         _seats[seatIndex]['isSpeaking'] = false;
@@ -263,13 +392,13 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
 
     try {
       await SupabaseConfig.client.from('room_seats').update({
-        'user_id': '',
-        'user_name': '',
-        'avatar_url': '',
+        'user_id': null,
+        'user_name': null,
+        'avatar_url': null,
         'is_muted': false,
       }).match({'room_id': widget.room.id, 'seat_index': seatIndex});
     } catch (e) {
-      debugPrint('Error clearing seat in Supabase: $e');
+      debugPrint('[LiveAudioRoom] Error clearing seat in Supabase: $e');
     }
   }
 
@@ -296,30 +425,106 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
         }
       });
     }
+
+    try {
+      await SupabaseConfig.client.from('room_seats').update({
+        'is_muted': newMuted,
+      }).match({'room_id': widget.room.id, 'seat_index': _mySeatIndex!});
+    } catch (e) {
+      debugPrint('[LiveAudioRoom] Error toggling seat mic in Supabase: $e');
+    }
   }
 
-  void _triggerGift(String giftName, String icon, int cost) async {
-    setState(() {
-      _activeGiftBanner = '✨ You gifted $icon $giftName to ${widget.room.hostName}! (+$cost Charm)';
-      _messages.add({'sender': '👑 Me', 'text': 'sent $icon $giftName to Host'});
-    });
+  void _displayGiftBanner(String text) {
+    setState(() => _activeGiftBanner = text);
     _giftBannerTimer?.cancel();
     _giftBannerTimer = Timer(const Duration(seconds: 4), () {
       if (mounted) setState(() => _activeGiftBanner = null);
     });
+  }
+
+  void _sendMessage(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+
+    final profile = context.read<ProfileBloc>().state.profile;
+    final myName = profile.nickname.isNotEmpty ? profile.nickname : 'Me';
+
+    setState(() {
+      _messages.add({'sender': myName, 'text': trimmed});
+      _msgController.clear();
+    });
 
     try {
-      final myId = AuthSessionManager.currentUserId;
-      if (myId == null) return;
-      final profileRes = await SupabaseConfig.client.from('profiles').select('coin_balance').eq('id', myId).maybeSingle();
-      if (profileRes != null) {
-        final currentCoins = (profileRes['coin_balance'] as num?)?.toDouble() ?? 0.0;
-        if (currentCoins >= cost) {
-          await SupabaseConfig.client.from('profiles').update({'coin_balance': currentCoins - cost}).eq('id', myId);
-        }
-      }
+      _roomChannel?.sendBroadcastMessage(
+        event: 'chat',
+        payload: {
+          'sender': myName,
+          'text': trimmed,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
     } catch (e) {
-      debugPrint('Gift balance sync error: $e');
+      debugPrint('[LiveAudioRoom] Chat broadcast error: $e');
+    }
+  }
+
+  void _triggerGift(String giftName, String icon, int cost) async {
+    final currentUserId = AuthSessionManager.currentUserId;
+    if (currentUserId == null) return;
+
+    final profile = context.read<ProfileBloc>().state.profile;
+    if (profile.coinBalance < cost) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Insufficient coins! You need $cost coins. Top up in wallet. 🪙'),
+          backgroundColor: Colors.redAccent,
+          action: SnackBarAction(
+            label: 'Top Up',
+            textColor: Colors.white,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CoinsWalletPage()),
+              );
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
+    final senderName = profile.nickname.isNotEmpty ? profile.nickname : 'Me';
+    _displayGiftBanner('✨ You gifted $icon $giftName to ${widget.room.hostName}! (+$cost Charm)');
+    setState(() {
+      _messages.add({
+        'sender': '👑 $senderName',
+        'text': 'sent $icon $giftName to Host',
+      });
+    });
+
+    try {
+      final newBalance = profile.coinBalance - cost;
+      await SupabaseConfig.client
+          .from('profiles')
+          .update({'coin_balance': newBalance})
+          .eq('id', currentUserId);
+
+      if (mounted) {
+        context.read<ProfileBloc>().add(LoadUserProfileEvent());
+      }
+
+      _roomChannel?.sendBroadcastMessage(
+        event: 'gift',
+        payload: {
+          'sender': senderName,
+          'giftName': giftName,
+          'giftIcon': icon,
+          'cost': cost,
+        },
+      );
+    } catch (e) {
+      debugPrint('[LiveAudioRoom] Gift balance sync error: $e');
     }
   }
 
@@ -397,7 +602,7 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
               height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.primaryGreen.withOpacity(0.3),
+                color: AppColors.primaryGreen.withValues(alpha: 0.3),
               ),
             ),
           ),
@@ -636,7 +841,11 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
 
           return GestureDetector(
             onTap: () {
-              if (seat['name'] == 'Me') {
+              final currentUserId = AuthSessionManager.currentUserId;
+              final isMySeat = index == _mySeatIndex ||
+                  (currentUserId != null && seat['userId'] != null && seat['userId'] == currentUserId);
+
+              if (isMySeat) {
                 _showMySeatOptions(index);
               } else if (isOccupied) {
                 UserProfilePopover.show(
@@ -794,7 +1003,7 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.accentOrange.withOpacity(0.5),
+            color: AppColors.accentOrange.withValues(alpha: 0.5),
             blurRadius: 10,
           ),
         ],
@@ -832,7 +1041,7 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: isSys ? AppColors.primaryGreen.withOpacity(0.4) : Colors.black38,
+                color: isSys ? AppColors.primaryGreen.withValues(alpha: 0.4) : Colors.black38,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: RichText(
@@ -867,8 +1076,8 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.4),
-        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.08))),
+        color: Colors.black.withValues(alpha: 0.4),
+        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
       ),
       child: Row(
         children: [
@@ -878,7 +1087,7 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
               height: 42,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
+                color: Colors.white.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(22),
               ),
               child: Row(
@@ -895,14 +1104,7 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
                         border: InputBorder.none,
                         isDense: true,
                       ),
-                      onSubmitted: (txt) {
-                        if (txt.trim().isNotEmpty) {
-                          setState(() {
-                            _messages.add({'sender': 'Me', 'text': txt.trim()});
-                            _msgController.clear();
-                          });
-                        }
-                      },
+                      onSubmitted: (txt) => _sendMessage(txt),
                     ),
                   ),
                 ],
@@ -959,7 +1161,7 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
         height: 44,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: color.withOpacity(0.2),
+          color: color.withValues(alpha: 0.2),
           border: Border.all(color: color, width: 1.5),
         ),
         child: Icon(icon, color: color, size: 22),

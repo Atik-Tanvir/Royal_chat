@@ -55,12 +55,11 @@ class EmbossedBlockWidget extends StatelessWidget {
         margin: const EdgeInsets.all(2.5),
         decoration: BoxDecoration(
           color: block.displayColor,
-          borderRadius: BorderRadius.circular(2),
           border: Border(
-            top: BorderSide(color: Colors.white.withOpacity(0.35), width: 1.5),
-            left: BorderSide(color: Colors.white.withOpacity(0.35), width: 1.5),
-            bottom: BorderSide(color: Colors.black.withOpacity(0.2), width: 1.5),
-            right: BorderSide(color: Colors.black.withOpacity(0.2), width: 1.5),
+            top: BorderSide(color: Colors.white.withValues(alpha: 0.35), width: 1.5),
+            left: BorderSide(color: Colors.white.withValues(alpha: 0.35), width: 1.5),
+            bottom: BorderSide(color: Colors.black.withValues(alpha: 0.2), width: 1.5),
+            right: BorderSide(color: Colors.black.withValues(alpha: 0.2), width: 1.5),
           ),
         ),
       ),

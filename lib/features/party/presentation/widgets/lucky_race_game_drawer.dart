@@ -1,5 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/config/auth_session_manager.dart';
+import '../../../../core/config/supabase_config.dart';
+import '../../../profile/presentation/bloc/profile_bloc.dart';
+import '../../../profile/presentation/bloc/profile_event.dart';
+import '../../../profile/presentation/bloc/profile_state.dart';
 
 class LuckyRaceGameDrawer extends StatefulWidget {
   final VoidCallback? onRechargeTap;
@@ -25,7 +31,6 @@ class LuckyRaceGameDrawer extends StatefulWidget {
 class _LuckyRaceGameDrawerState extends State<LuckyRaceGameDrawer> {
   int _selectedLane = 0; // 0: Stock, 1: ATV, 2: SUV
   int _selectedChip = 500;
-  int _coinsBalance = 161480;
   int _secondsRemaining = 33;
   bool _autoRepeat = false;
   Timer? _timer;
@@ -40,7 +45,7 @@ class _LuckyRaceGameDrawerState extends State<LuckyRaceGameDrawer> {
       'pool': '340.5K',
       'color': const Color(0xFF3B82F6),
       'icon': Icons.directions_car_filled,
-      'myBet': 1000,
+      'myBet': 0,
     },
     {
       'title': 'ATV DESERT',
@@ -58,7 +63,7 @@ class _LuckyRaceGameDrawerState extends State<LuckyRaceGameDrawer> {
       'pool': '82.0K',
       'color': const Color(0xFFFF5252),
       'icon': Icons.agriculture,
-      'myBet': 500,
+      'myBet': 0,
     },
   ];
 
@@ -89,8 +94,17 @@ class _LuckyRaceGameDrawerState extends State<LuckyRaceGameDrawer> {
     super.dispose();
   }
 
-  void _placeBet() {
-    if (_coinsBalance < _selectedChip) {
+  void _placeBet() async {
+    final currentUserId = AuthSessionManager.currentUserId;
+    if (currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to place bets!')),
+      );
+      return;
+    }
+
+    final profile = context.read<ProfileBloc>().state.profile;
+    if (profile.coinBalance < _selectedChip) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Insufficient coins! Please recharge.'),
@@ -101,20 +115,35 @@ class _LuckyRaceGameDrawerState extends State<LuckyRaceGameDrawer> {
     }
 
     setState(() {
-      _coinsBalance -= _selectedChip;
       _lanes[_selectedLane]['myBet'] =
           (_lanes[_selectedLane]['myBet'] as int) + _selectedChip;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Bet $_selectedChip coins placed on ${_lanes[_selectedLane]['title']}!',
+    try {
+      final newBalance = profile.coinBalance - _selectedChip;
+      await SupabaseConfig.client
+          .from('profiles')
+          .update({'coin_balance': newBalance})
+          .eq('id', currentUserId);
+
+      if (mounted) {
+        context.read<ProfileBloc>().add(LoadUserProfileEvent());
+      }
+    } catch (e) {
+      debugPrint('[LuckyRace] Bet balance update error: $e');
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Bet $_selectedChip coins placed on ${_lanes[_selectedLane]['title']}!',
+          ),
+          duration: const Duration(seconds: 2),
+          backgroundColor: const Color(0xFF6366F1),
         ),
-        duration: const Duration(seconds: 2),
-        backgroundColor: const Color(0xFF6366F1),
-      ),
-    );
+      );
+    }
   }
 
   @override
@@ -522,48 +551,55 @@ class _LuckyRaceGameDrawerState extends State<LuckyRaceGameDrawer> {
             child: Row(
               children: [
                 // Coins Balance Pill
-                GestureDetector(
-                  onTap: widget.onRechargeTap,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E2433),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.08),
+                BlocBuilder<ProfileBloc, ProfileState>(
+                  builder: (context, profileState) {
+                    final balance = profileState.profile.coinBalance.toInt();
+                    final balanceStr = balance.toString().replaceAllMapped(
+                      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                      (m) => '${m[1]},',
+                    );
+
+                    return GestureDetector(
+                      onTap: widget.onRechargeTap,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E2433),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.08),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.monetization_on,
+                              color: Color(0xFFFFD700),
+                              size: 16,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              balanceStr,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Icon(
+                              Icons.add_circle,
+                              color: Color(0xFF10B981),
+                              size: 16,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.monetization_on,
-                          color: Color(0xFFFFD700),
-                          size: 16,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _coinsBalance.toString().replaceAllMapped(
-                            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-                            (m) => '${m[1]},',
-                          ),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Icon(
-                          Icons.add_circle,
-                          color: Color(0xFF10B981),
-                          size: 16,
-                        ),
-                      ],
-                    ),
-                  ),
+                    );
+                  },
                 ),
                 const SizedBox(width: 12),
                 // Big Bet Button
