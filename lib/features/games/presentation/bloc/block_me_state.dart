@@ -15,11 +15,11 @@ class BlockMeState extends Equatable {
   const BlockMeState({
     required this.grid,
     required this.availableShapes,
-    this.score = 941249408,
-    this.multiplier = 256,
+    this.score = 0,
+    this.multiplier = 1,
     this.lives = 3,
-    this.dailyRank = 11,
-    this.monthlyRank = 10,
+    this.dailyRank = 1,
+    this.monthlyRank = 1,
     this.hasClearedLines = false,
   });
 

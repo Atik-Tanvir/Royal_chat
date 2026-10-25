@@ -1,4 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/config/auth_session_manager.dart';
+import '../../../../core/config/supabase_config.dart';
+import '../../../../core/services/wallet_transaction_service.dart';
+import '../../../profile/domain/entities/wallet_transaction.dart';
 import '../../domain/entities/game_block.dart';
 import '../../domain/entities/polyomino_shape.dart';
 import 'block_me_event.dart';
@@ -26,54 +31,24 @@ class BlockMeBloc extends Bloc<BlockMeEvent, BlockMeState> {
       ),
     );
 
-    // Replicate Screenshot 5 exact board layout:
-    // Green cluster (Rows 3, 4, 5 - Cols 0, 1, 2)
-    for (int r = 3; r <= 5; r++) {
-      for (int c = 0; c <= 2; c++) {
-        grid[r][c] = const BlockItem(color: BlockColor.green, isFilled: true);
-      }
-    }
-    // Row 6 (Cols 0, 1 green, col 2 blue)
-    grid[6][0] = const BlockItem(color: BlockColor.green, isFilled: true);
-    grid[6][1] = const BlockItem(color: BlockColor.green, isFilled: true);
-    grid[6][2] = const BlockItem(color: BlockColor.blue, isFilled: true);
-
-    // Row 7 (Bottom line: cols 0..6 purple)
-    for (int c = 0; c <= 6; c++) {
-      grid[7][c] = const BlockItem(color: BlockColor.purple, isFilled: true);
-    }
-
-    // Column 7 (Right edge: purple)
-    for (int r = 0; r <= 7; r++) {
-      grid[r][7] = const BlockItem(color: BlockColor.purple, isFilled: true);
-    }
-
-    // Column 6 (purple vertical extension)
-    grid[4][6] = const BlockItem(color: BlockColor.purple, isFilled: true);
-    grid[5][6] = const BlockItem(color: BlockColor.purple, isFilled: true);
-    grid[6][6] = const BlockItem(color: BlockColor.purple, isFilled: true);
-
-    // Orange cluster near top-right (Row 0: cols 4, 5, 6)
-    grid[0][4] = const BlockItem(color: BlockColor.orange, isFilled: true);
-    grid[0][5] = const BlockItem(color: BlockColor.orange, isFilled: true);
-    grid[0][6] = const BlockItem(color: BlockColor.orange, isFilled: true);
-
-    // Orange 2x1 block (Rows 3, 4 - Col 5)
-    grid[3][5] = const BlockItem(color: BlockColor.orange, isFilled: true);
-    grid[4][5] = const BlockItem(color: BlockColor.orange, isFilled: true);
+    // Initial playable starting blocks
+    grid[3][3] = const BlockItem(color: BlockColor.green, isFilled: true);
+    grid[3][4] = const BlockItem(color: BlockColor.green, isFilled: true);
+    grid[4][3] = const BlockItem(color: BlockColor.blue, isFilled: true);
+    grid[4][4] = const BlockItem(color: BlockColor.blue, isFilled: true);
 
     return BlockMeState(
       grid: grid,
       availableShapes: ShapeGenerator.getSampleShapes(),
-      score: 941249408,
-      multiplier: 256,
+      score: 0,
+      multiplier: 1,
       lives: 3,
-      dailyRank: 11,
-      monthlyRank: 10,
+      dailyRank: 1,
+      monthlyRank: 1,
     );
   }
 
-  void _onPlaceShape(PlaceShapeEvent event, Emitter<BlockMeState> emit) {
+  Future<void> _onPlaceShape(PlaceShapeEvent event, Emitter<BlockMeState> emit) async {
     final newGrid = List<List<BlockItem>>.generate(
       8,
       (r) => List<BlockItem>.from(state.grid[r]),
@@ -136,7 +111,9 @@ class BlockMeBloc extends Bloc<BlockMeEvent, BlockMeState> {
     }
 
     final clearedCount = fullRows.length + fullCols.length;
-    final addedScore = (clearedCount > 0 ? clearedCount * 1000 : 100) * state.multiplier;
+    final addedScore = (clearedCount > 0 ? clearedCount * 500 : 50) * state.multiplier;
+    final newScore = state.score + addedScore;
+    final newMultiplier = clearedCount > 0 ? (state.multiplier + clearedCount).clamp(1, 50) : state.multiplier;
 
     // Update remaining shapes
     final remainingShapes = List<PolyominoShape>.from(state.availableShapes)
@@ -145,8 +122,50 @@ class BlockMeBloc extends Bloc<BlockMeEvent, BlockMeState> {
     emit(state.copyWith(
       grid: newGrid,
       availableShapes: remainingShapes.isEmpty ? ShapeGenerator.getSampleShapes() : remainingShapes,
-      score: state.score + addedScore,
+      score: newScore,
+      multiplier: newMultiplier,
       hasClearedLines: clearedCount > 0,
     ));
+
+    // Award real coins if lines were cleared
+    if (clearedCount > 0) {
+      final rewardCoins = (clearedCount * 50).toDouble();
+      final currentUserId = AuthSessionManager.currentUserId;
+      if (currentUserId != null && currentUserId.isNotEmpty) {
+        try {
+          final profileRes = await SupabaseConfig.client
+              .from('profiles')
+              .select('coin_balance')
+              .eq('id', currentUserId)
+              .maybeSingle();
+
+          if (profileRes != null) {
+            final currentCoins = (profileRes['coin_balance'] as num?)?.toDouble() ?? 0.0;
+            final updatedCoins = currentCoins + rewardCoins;
+
+            await SupabaseConfig.client
+                .from('profiles')
+                .update({'coin_balance': updatedCoins})
+                .eq('id', currentUserId);
+
+            await WalletTransactionService.recordTransaction(
+              WalletTransaction(
+                id: 'GM-${DateTime.now().millisecondsSinceEpoch}',
+                userId: currentUserId,
+                type: 'daily_reward',
+                title: 'Block Me Game Clear Reward (+$rewardCoins 🪙)',
+                amount: rewardCoins,
+                currency: 'coin',
+                status: 'Completed',
+                gateway: 'Game Reward',
+                createdAt: DateTime.now(),
+              ),
+            );
+          }
+        } catch (e) {
+          debugPrint('[BlockMeBloc] Coin award error: $e');
+        }
+      }
+    }
   }
 }
