@@ -46,11 +46,13 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       }
 
       final user = SupabaseConfig.client.auth.currentUser;
-      final defaultName = user?.userMetadata?['full_name'] as String? ??
+      final defaultName = AuthSessionManager.currentUserName ??
+          user?.userMetadata?['full_name'] as String? ??
           user?.userMetadata?['name'] as String? ??
           user?.email?.split('@').first ??
           'RoyalUser';
-      final defaultAvatar = user?.userMetadata?['avatar_url'] as String? ?? '';
+      final defaultAvatar = AuthSessionManager.currentUserAvatar ??
+          user?.userMetadata?['avatar_url'] as String? ?? '';
 
       // 1. Fetch Profile from Supabase
       var profileRes = await SupabaseConfig.client

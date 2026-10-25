@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/config/auth_session_manager.dart';
 import '../../../../core/services/r2_storage_service.dart';
 import '../../../../core/widgets/custom_avatar.dart';
 import '../../../../core/widgets/royal_brand_logo.dart';
@@ -177,6 +178,17 @@ class _UserDetailPageState extends State<UserDetailPage> with SingleTickerProvid
                               avatarUrl: avatarUrl.isNotEmpty ? avatarUrl : null,
                             ),
                           );
+
+                      final activeUid = widget.userId.isNotEmpty
+                          ? widget.userId
+                          : (AuthSessionManager.currentUserId ?? '');
+
+                      AuthSessionManager.saveSession(
+                        userId: activeUid,
+                        name: newName,
+                        email: AuthSessionManager.currentUserEmail ?? '',
+                        avatarUrl: avatarUrl,
+                      );
 
                       Navigator.pop(sheetCtx);
                       ScaffoldMessenger.of(context).showSnackBar(

@@ -1,18 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../core/theme/app_theme.dart';
+import '../features/auth/presentation/pages/splash_screen.dart';
 import '../features/chat/presentation/bloc/chat_bloc.dart';
 import '../features/games/presentation/bloc/block_me_bloc.dart';
 import '../features/moments/presentation/bloc/moments_bloc.dart';
 import '../features/navigation/presentation/bloc/navigation_bloc.dart';
-import '../features/navigation/presentation/pages/main_navigation_page.dart';
 import '../features/party/data/repositories/party_repository_impl.dart';
 import '../features/party/presentation/bloc/party_bloc.dart';
 import '../features/party/presentation/bloc/party_event.dart';
 import '../features/profile/presentation/bloc/profile_bloc.dart';
-
-import '../core/config/auth_session_manager.dart';
-import '../features/auth/presentation/pages/login_page.dart';
 
 class GemgalaApp extends StatelessWidget {
   const GemgalaApp({super.key});
@@ -20,7 +17,6 @@ class GemgalaApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final partyRepository = PartyRepositoryImpl();
-    final bool isAuthenticated = AuthSessionManager.hasActiveSession;
 
     return MultiBlocProvider(
       providers: [
@@ -47,7 +43,7 @@ class GemgalaApp extends StatelessWidget {
         title: 'Royal Chat Live',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.theme,
-        home: isAuthenticated ? const MainNavigationPage() : const LoginPage(),
+        home: const SplashScreen(),
       ),
     );
   }
