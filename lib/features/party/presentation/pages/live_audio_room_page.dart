@@ -18,6 +18,8 @@ import '../../../../core/config/supabase_config.dart';
 import '../../../profile/presentation/bloc/profile_bloc.dart';
 import '../../../profile/presentation/bloc/profile_event.dart';
 import '../../../profile/presentation/bloc/profile_state.dart';
+import '../../../profile/domain/entities/wallet_transaction.dart';
+import '../../../../core/services/wallet_transaction_service.dart';
 
 class LiveAudioRoomPage extends StatefulWidget {
   final PartyRoom room;
@@ -45,6 +47,14 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
 
   final List<Map<String, String>> _messages = [];
   final TextEditingController _msgController = TextEditingController();
+
+  String get _hostUserId {
+    if (_seats.isNotEmpty) {
+      final uid = _seats[0]['userId']?.toString() ?? '';
+      if (uid.isNotEmpty) return uid;
+    }
+    return '';
+  }
 
   @override
   void initState() {
@@ -165,6 +175,11 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
                   'text': 'sent $giftIcon $giftName to Host',
                 });
               });
+
+              // If current user is host, refresh profile to reflect credited diamonds
+              if (_hostUserId.isNotEmpty && AuthSessionManager.currentUserId == _hostUserId) {
+                context.read<ProfileBloc>().add(LoadUserProfileEvent());
+              }
             },
           )
           .subscribe();
@@ -509,6 +524,37 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
           .from('profiles')
           .update({'coin_balance': newBalance})
           .eq('id', currentUserId);
+
+      // Record gift sent transaction
+      final tx = WalletTransaction(
+        id: 'GF-${DateTime.now().millisecondsSinceEpoch}',
+        userId: currentUserId,
+        type: 'gift_sent',
+        title: 'Sent $icon $giftName to ${widget.room.hostName}',
+        amount: cost.toDouble(),
+        currency: 'coin',
+        status: 'Completed',
+        gateway: 'Voice Room Gift',
+        createdAt: DateTime.now(),
+      );
+      await WalletTransactionService.recordTransaction(tx);
+
+      // Credit host with earned gems in Supabase (70% charm converted to diamonds)
+      if (_hostUserId.isNotEmpty && _hostUserId != currentUserId) {
+        final hostRow = await SupabaseConfig.client
+            .from('profiles')
+            .select('gem_balance')
+            .eq('id', _hostUserId)
+            .maybeSingle();
+        if (hostRow != null) {
+          final hostGems = (hostRow['gem_balance'] as num?)?.toDouble() ?? 0.0;
+          final earnedGems = (cost * 0.7);
+          await SupabaseConfig.client
+              .from('profiles')
+              .update({'gem_balance': hostGems + earnedGems})
+              .eq('id', _hostUserId);
+        }
+      }
 
       if (mounted) {
         context.read<ProfileBloc>().add(LoadUserProfileEvent());

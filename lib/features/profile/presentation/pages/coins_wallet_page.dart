@@ -5,6 +5,8 @@ import '../../../leaderboard/presentation/pages/leaderboard_page.dart';
 import '../bloc/profile_bloc.dart';
 import '../bloc/profile_event.dart';
 import '../bloc/profile_state.dart';
+import '../widgets/diamond_conversion_sheet.dart';
+import 'wallet_transactions_page.dart';
 
 class CoinsWalletPage extends StatelessWidget {
   final String currentBalance;
@@ -58,9 +60,13 @@ class CoinsWalletPage extends StatelessWidget {
                         ),
                         IconButton(
                           icon: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 24),
+                          tooltip: 'Transaction Records',
                           onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Coins transaction records synchronized with Supabase.')),
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const WalletTransactionsPage(initialTabIndex: 1),
+                              ),
                             );
                           },
                         ),
@@ -143,7 +149,7 @@ class CoinsWalletPage extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   children: [
                     const Text(
-                      'Earn Free Coins',
+                      'Earn & Exchange Coins',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -152,13 +158,13 @@ class CoinsWalletPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
 
-                    // 1. BlockMe Challenge
+                    // 1. Diamond Exchange
                     _buildTaskTile(
-                      iconEmoji: '🧩',
-                      title: 'Play BlockMe Puzzle',
-                      subtitle: '4-Line Clear to earn 50,000 🪙',
+                      iconEmoji: '💎',
+                      title: 'Exchange Diamonds for Coins',
+                      subtitle: 'Convert earned gems at 1💎 = 10🪙 + Bonus',
                       onTap: () {
-                        Navigator.pop(context);
+                        DiamondConversionSheet.show(context);
                       },
                     ),
 
@@ -175,24 +181,27 @@ class CoinsWalletPage extends StatelessWidget {
                       },
                     ),
 
-                    // 3. Play multiplayer games
+                    // 3. BlockMe Challenge
                     _buildTaskTile(
-                      iconEmoji: '🎮',
-                      title: 'Play multiplayer games',
-                      subtitle: 'Win More Coins',
+                      iconEmoji: '🧩',
+                      title: 'Play BlockMe Puzzle',
+                      subtitle: '4-Line Clear to earn 50,000 🪙',
                       onTap: () {
                         Navigator.pop(context);
                       },
                     ),
 
-                    // 4. Top Offers
+                    // 4. Transaction Records
                     _buildTaskTile(
-                      iconEmoji: '📋',
-                      title: 'Top Offers',
-                      subtitle: 'Complete Offers to Earn Coins',
+                      iconEmoji: '📜',
+                      title: 'Recharge & Payment History',
+                      subtitle: 'View synchronized Supabase records',
                       onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Opening partner offers wall...')),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const WalletTransactionsPage(initialTabIndex: 0),
+                          ),
                         );
                       },
                     ),
@@ -274,6 +283,15 @@ class CoinsWalletPage extends StatelessWidget {
 class _TopUpBottomSheet extends StatelessWidget {
   const _TopUpBottomSheet();
 
+  void _showCheckoutDialog(BuildContext context, Map<String, dynamic> pkg) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _PaymentCheckoutSheet(pkg: pkg),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final packages = [
@@ -326,22 +344,15 @@ class _TopUpBottomSheet extends StatelessWidget {
               final pkg = packages[index];
               return GestureDetector(
                 onTap: () {
-                  final amount = pkg['raw'] as double;
-                  context.read<ProfileBloc>().add(RechargeCoinsEvent(amount));
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('✨ Recharged ${pkg['coins']} coins! Saved in Supabase.'),
-                      backgroundColor: AppColors.gemEmerald,
-                    ),
-                  );
+                  _showCheckoutDialog(context, pkg);
                 },
                 child: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFFBEB),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.goldCoin.withOpacity(0.5)),
+                    border: Border.all(color: AppColors.goldCoin.withValues(alpha: 0.5)),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -382,6 +393,214 @@ class _TopUpBottomSheet extends StatelessWidget {
             },
           ),
           const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+}
+
+class _PaymentCheckoutSheet extends StatefulWidget {
+  final Map<String, dynamic> pkg;
+
+  const _PaymentCheckoutSheet({required this.pkg});
+
+  @override
+  State<_PaymentCheckoutSheet> createState() => _PaymentCheckoutSheetState();
+}
+
+class _PaymentCheckoutSheetState extends State<_PaymentCheckoutSheet> {
+  String _selectedMethod = 'bKash';
+  bool _isProcessing = false;
+
+  final List<Map<String, String>> _methods = [
+    {'name': 'bKash', 'icon': '📱', 'desc': 'Instant Mobile Recharge'},
+    {'name': 'Nagad', 'icon': '⚡', 'desc': 'Fast Digital Wallet'},
+    {'name': 'Google Play', 'icon': '💳', 'desc': 'Official In-App Purchase'},
+    {'name': 'USDT (TRC20)', 'icon': '🪙', 'desc': 'Instant Crypto Settlement'},
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final coins = widget.pkg['coins'] as String;
+    final bonus = widget.pkg['bonus'] as String;
+    final price = widget.pkg['price'] as String;
+    final rawAmount = widget.pkg['raw'] as double;
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Select Payment Method',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.grey),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Package Details Card
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBEB),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.goldCoin.withValues(alpha: 0.4)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.monetization_on, color: AppColors.goldCoin, size: 28),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$coins Coins',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        Text(
+                          bonus,
+                          style: const TextStyle(color: Color(0xFFE11D48), fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                Text(
+                  price,
+                  style: const TextStyle(
+                    color: Color(0xFF1E293B),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 20,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Payment Methods
+          ...List.generate(_methods.length, (i) {
+            final m = _methods[i];
+            final isSel = _selectedMethod == m['name'];
+
+            return GestureDetector(
+              onTap: () => setState(() => _selectedMethod = m['name']!),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isSel ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isSel ? const Color(0xFF16A34A) : Colors.grey.shade200,
+                    width: isSel ? 1.5 : 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Text(m['icon']!, style: const TextStyle(fontSize: 20)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            m['name']!,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          Text(
+                            m['desc']!,
+                            style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (isSel)
+                      const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 20),
+                  ],
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 20),
+
+          // Pay Button
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF16A34A),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              elevation: 2,
+            ),
+            onPressed: _isProcessing
+                ? null
+                : () async {
+                    setState(() => _isProcessing = true);
+                    await Future.delayed(const Duration(milliseconds: 600));
+
+                    if (!context.mounted) return;
+
+                    context.read<ProfileBloc>().add(
+                          RechargeCoinsEvent(
+                            rawAmount,
+                            gateway: _selectedMethod,
+                            packageTitle: 'Top-up $coins Coins ($price)',
+                          ),
+                        );
+
+                    Navigator.pop(context);
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('✨ Payment successful! Recharged $coins coins via $_selectedMethod.'),
+                        backgroundColor: AppColors.gemEmerald,
+                        action: SnackBarAction(
+                          label: 'View History',
+                          textColor: Colors.white,
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const WalletTransactionsPage(initialTabIndex: 1),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  },
+            child: _isProcessing
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                : Text(
+                    'Pay $price & Add Coins',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+          ),
         ],
       ),
     );

@@ -1,21 +1,38 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/config/auth_session_manager.dart';
 import '../../../../core/config/supabase_config.dart';
+import '../../../../core/services/wallet_transaction_service.dart';
 import '../../domain/entities/user_profile.dart';
+import '../../domain/entities/wallet_transaction.dart';
 import 'profile_event.dart';
 import 'profile_state.dart';
 
 class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
+  RealtimeChannel? _profileChannel;
+  RealtimeChannel? _withdrawalsChannel;
+
   ProfileBloc() : super(_createInitialState()) {
     on<LoadUserProfileEvent>(_onLoadUserProfile);
+    on<LoadTransactionsEvent>(_onLoadTransactions);
     on<RechargeCoinsEvent>(_onRechargeCoins);
     on<WithdrawGemsEvent>(_onWithdrawGems);
+    on<ConvertGemsToCoinsEvent>(_onConvertGemsToCoins);
+    on<ClaimDailyRewardEvent>(_onClaimDailyReward);
+    on<ProfileBalancesUpdatedFromRealtimeEvent>(_onProfileBalancesUpdatedFromRealtime);
     on<UpdateProfileDetailsEvent>(_onUpdateProfileDetails);
     on<SignOutEvent>(_onSignOut);
 
     // Initial dynamic fetch from Supabase
     add(LoadUserProfileEvent());
+  }
+
+  @override
+  Future<void> close() {
+    _profileChannel?.unsubscribe();
+    _withdrawalsChannel?.unsubscribe();
+    return super.close();
   }
 
   Future<void> _onLoadUserProfile(
@@ -106,8 +123,79 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       }
 
       emit(state.copyWith(profile: currentProfile, recentWithdrawalText: ticker));
+
+      // 3. Subscribe to Realtime Supabase updates on user's profile
+      _subscribeToRealtime(currentUserId);
+
+      // 4. Load wallet transactions
+      add(LoadTransactionsEvent());
     } catch (e) {
-      debugPrint('ProfileBloc Supabase fetch error: $e');
+      debugPrint('[ProfileBloc] Supabase fetch error: $e');
+    }
+  }
+
+  void _subscribeToRealtime(String userId) {
+    if (_profileChannel != null) return;
+
+    try {
+      _profileChannel = SupabaseConfig.client
+          .channel('public:profiles:$userId')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.update,
+            schema: 'public',
+            table: 'profiles',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'id',
+              value: userId,
+            ),
+            callback: (payload) {
+              final newRecord = payload.newRecord;
+              if (newRecord.isNotEmpty) {
+                final coins = (newRecord['coin_balance'] as num?)?.toDouble();
+                final gems = (newRecord['gem_balance'] as num?)?.toDouble();
+                add(ProfileBalancesUpdatedFromRealtimeEvent(
+                  coinBalance: coins,
+                  gemBalance: gems,
+                ));
+              }
+            },
+          )
+          .subscribe();
+
+      _withdrawalsChannel = SupabaseConfig.client
+          .channel('public:withdrawals:$userId')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'withdrawals',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'user_id',
+              value: userId,
+            ),
+            callback: (_) {
+              add(LoadTransactionsEvent());
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('[ProfileBloc] Realtime subscription error: $e');
+    }
+  }
+
+  Future<void> _onLoadTransactions(
+    LoadTransactionsEvent event,
+    Emitter<ProfileState> emit,
+  ) async {
+    final userId = state.profile.userId;
+    if (userId.isEmpty) return;
+
+    try {
+      final txList = await WalletTransactionService.getTransactions(userId);
+      emit(state.copyWith(transactions: txList));
+    } catch (e) {
+      debugPrint('[ProfileBloc] Load transactions error: $e');
     }
   }
 
@@ -116,30 +204,30 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     Emitter<ProfileState> emit,
   ) async {
     final newBalance = state.profile.coinBalance + event.amount;
-    final updatedProfile = UserProfile(
-      userId: state.profile.userId,
-      nickname: state.profile.nickname,
-      avatarUrl: state.profile.avatarUrl,
-      country: state.profile.country,
-      gender: state.profile.gender,
-      age: state.profile.age,
-      level: state.profile.level,
-      isVip: state.profile.isVip,
-      friendsCount: state.profile.friendsCount,
-      followingCount: state.profile.followingCount,
-      fansCount: state.profile.fansCount,
-      visitorsCount: state.profile.visitorsCount,
-      gemBalance: state.profile.gemBalance,
-      coinBalance: newBalance,
-    );
+    final updatedProfile = _cloneProfileWith(coinBalance: newBalance);
     emit(state.copyWith(profile: updatedProfile));
 
     try {
       await SupabaseConfig.client.from('profiles').update({
         'coin_balance': newBalance,
       }).eq('id', state.profile.userId);
+
+      // Record transaction
+      final tx = WalletTransaction(
+        id: 'TX-${DateTime.now().millisecondsSinceEpoch}',
+        userId: state.profile.userId,
+        type: 'recharge',
+        title: event.packageTitle,
+        amount: event.amount,
+        currency: 'coin',
+        status: 'Completed',
+        gateway: event.gateway,
+        createdAt: DateTime.now(),
+      );
+      await WalletTransactionService.recordTransaction(tx);
+      add(LoadTransactionsEvent());
     } catch (e) {
-      debugPrint('ProfileBloc Supabase update error: $e');
+      debugPrint('[ProfileBloc] Recharge error: $e');
     }
   }
 
@@ -149,22 +237,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
   ) async {
     if (state.profile.gemBalance >= event.gems) {
       final newGems = state.profile.gemBalance - event.gems;
-      final updatedProfile = UserProfile(
-        userId: state.profile.userId,
-        nickname: state.profile.nickname,
-        avatarUrl: state.profile.avatarUrl,
-        country: state.profile.country,
-        gender: state.profile.gender,
-        age: state.profile.age,
-        level: state.profile.level,
-        isVip: state.profile.isVip,
-        friendsCount: state.profile.friendsCount,
-        followingCount: state.profile.followingCount,
-        fansCount: state.profile.fansCount,
-        visitorsCount: state.profile.visitorsCount,
-        gemBalance: newGems,
-        coinBalance: state.profile.coinBalance,
-      );
+      final updatedProfile = _cloneProfileWith(gemBalance: newGems);
       emit(state.copyWith(profile: updatedProfile));
 
       try {
@@ -172,13 +245,13 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
           'gem_balance': newGems,
         }).eq('id', state.profile.userId);
 
-        // Record live withdrawal request in Supabase withdrawals table
+        final withdrawalId = 'WD-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
         final gatewayInfo = event.accountNumber.isNotEmpty
             ? '${event.gateway} (${event.accountNumber})'
             : event.gateway;
 
         await SupabaseConfig.client.from('withdrawals').insert({
-          'id': 'WD-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+          'id': withdrawalId,
           'user_id': state.profile.userId,
           'user_name': state.profile.nickname,
           'user_avatar': state.profile.avatarUrl,
@@ -187,10 +260,105 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
           'gems': event.gems.toInt(),
           'status': 'Pending',
         });
+
+        final tx = WalletTransaction(
+          id: withdrawalId,
+          userId: state.profile.userId,
+          type: 'withdrawal',
+          title: 'Withdrawal to $gatewayInfo',
+          amount: event.gems,
+          currency: 'gem',
+          status: 'Pending',
+          gateway: event.gateway,
+          createdAt: DateTime.now(),
+        );
+        await WalletTransactionService.recordTransaction(tx);
+        add(LoadTransactionsEvent());
       } catch (e) {
-        debugPrint('ProfileBloc Supabase withdrawal error: $e');
+        debugPrint('[ProfileBloc] Withdrawal error: $e');
       }
     }
+  }
+
+  Future<void> _onConvertGemsToCoins(
+    ConvertGemsToCoinsEvent event,
+    Emitter<ProfileState> emit,
+  ) async {
+    if (state.profile.gemBalance >= event.gems) {
+      final newGems = state.profile.gemBalance - event.gems;
+      final newCoins = state.profile.coinBalance + event.coins;
+      final updatedProfile = _cloneProfileWith(
+        gemBalance: newGems,
+        coinBalance: newCoins,
+      );
+      emit(state.copyWith(profile: updatedProfile));
+
+      try {
+        await SupabaseConfig.client.from('profiles').update({
+          'gem_balance': newGems,
+          'coin_balance': newCoins,
+        }).eq('id', state.profile.userId);
+
+        final tx = WalletTransaction(
+          id: 'EX-${DateTime.now().millisecondsSinceEpoch}',
+          userId: state.profile.userId,
+          type: 'conversion',
+          title: 'Exchange ${event.gems.toInt()} 💎 to Coins',
+          amount: event.coins,
+          currency: 'coin',
+          status: 'Completed',
+          gateway: 'Diamond Converter',
+          createdAt: DateTime.now(),
+        );
+        await WalletTransactionService.recordTransaction(tx);
+        add(LoadTransactionsEvent());
+      } catch (e) {
+        debugPrint('[ProfileBloc] Conversion error: $e');
+      }
+    }
+  }
+
+  Future<void> _onClaimDailyReward(
+    ClaimDailyRewardEvent event,
+    Emitter<ProfileState> emit,
+  ) async {
+    final newCoins = state.profile.coinBalance + event.rewardCoins;
+    final updatedProfile = _cloneProfileWith(coinBalance: newCoins);
+    emit(state.copyWith(profile: updatedProfile));
+
+    try {
+      await SupabaseConfig.client.from('profiles').update({
+        'coin_balance': newCoins,
+      }).eq('id', state.profile.userId);
+
+      final tx = WalletTransaction(
+        id: 'RW-${DateTime.now().millisecondsSinceEpoch}',
+        userId: state.profile.userId,
+        type: 'daily_reward',
+        title: 'Day ${event.dayNumber} Sign-in Reward',
+        amount: event.rewardCoins,
+        currency: 'coin',
+        status: 'Completed',
+        gateway: 'Daily Task',
+        createdAt: DateTime.now(),
+      );
+      await WalletTransactionService.recordTransaction(tx);
+      add(LoadTransactionsEvent());
+    } catch (e) {
+      debugPrint('[ProfileBloc] Daily reward error: $e');
+    }
+  }
+
+  void _onProfileBalancesUpdatedFromRealtime(
+    ProfileBalancesUpdatedFromRealtimeEvent event,
+    Emitter<ProfileState> emit,
+  ) {
+    if (event.coinBalance == null && event.gemBalance == null) return;
+    final updatedProfile = _cloneProfileWith(
+      coinBalance: event.coinBalance ?? state.profile.coinBalance,
+      gemBalance: event.gemBalance ?? state.profile.gemBalance,
+    );
+    emit(state.copyWith(profile: updatedProfile));
   }
 
   Future<void> _onUpdateProfileDetails(
@@ -231,7 +399,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
             .eq('id', state.profile.userId);
       }
     } catch (e) {
-      debugPrint('ProfileBloc Supabase update profile error: $e');
+      debugPrint('[ProfileBloc] Supabase update profile error: $e');
     }
   }
 
@@ -239,8 +407,34 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     SignOutEvent event,
     Emitter<ProfileState> emit,
   ) async {
+    _profileChannel?.unsubscribe();
+    _withdrawalsChannel?.unsubscribe();
+    _profileChannel = null;
+    _withdrawalsChannel = null;
     await AuthSessionManager.signOut();
     emit(_createInitialState());
+  }
+
+  UserProfile _cloneProfileWith({
+    double? coinBalance,
+    double? gemBalance,
+  }) {
+    return UserProfile(
+      userId: state.profile.userId,
+      nickname: state.profile.nickname,
+      avatarUrl: state.profile.avatarUrl,
+      country: state.profile.country,
+      gender: state.profile.gender,
+      age: state.profile.age,
+      level: state.profile.level,
+      isVip: state.profile.isVip,
+      friendsCount: state.profile.friendsCount,
+      followingCount: state.profile.followingCount,
+      fansCount: state.profile.fansCount,
+      visitorsCount: state.profile.visitorsCount,
+      gemBalance: gemBalance ?? state.profile.gemBalance,
+      coinBalance: coinBalance ?? state.profile.coinBalance,
+    );
   }
 
   static ProfileState _createInitialState() {
@@ -249,9 +443,9 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       userId: activeId,
       nickname: activeId.isNotEmpty ? activeId : 'Royal User',
       avatarUrl: '',
-      country: '',
-      gender: '',
-      age: 0,
+      country: 'Bangladesh',
+      gender: '♂ 20',
+      age: 20,
       level: 1,
       isVip: false,
       friendsCount: 0,
@@ -259,12 +453,8 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       fansCount: 0,
       visitorsCount: 0,
       gemBalance: 0.0,
-      coinBalance: 0.0,
+      coinBalance: 5000.0,
     );
-
-    return ProfileState(
-      profile: profile,
-      recentWithdrawalText: 'Welcome to Royal Chat Live',
-    );
+    return ProfileState(profile: profile);
   }
 }

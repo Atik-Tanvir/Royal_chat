@@ -14,6 +14,8 @@ import '../widgets/withdrawal_ticker_widget.dart';
 import '../widgets/signin_reward_dialog.dart';
 import 'coins_wallet_page.dart';
 import 'user_detail_page.dart';
+import 'wallet_transactions_page.dart';
+import '../widgets/diamond_conversion_sheet.dart';
 import '../../../leaderboard/presentation/pages/leaderboard_page.dart';
 import '../../../auth/presentation/pages/login_page.dart';
 
@@ -247,7 +249,30 @@ class ProfileTabPage extends StatelessWidget {
               'My Wallet',
               style: AppTextStyles.titleBold.copyWith(fontSize: 17),
             ),
-            const Icon(Icons.help_outline_rounded, color: Colors.white60, size: 18),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const WalletTransactionsPage(initialTabIndex: 0),
+                  ),
+                );
+              },
+              child: const Row(
+                children: [
+                  Icon(Icons.receipt_long_rounded, color: AppColors.goldCoin, size: 16),
+                  SizedBox(width: 4),
+                  Text(
+                    'Records',
+                    style: TextStyle(
+                      color: AppColors.goldCoin,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -527,6 +552,51 @@ class _WithdrawalModalSheetState extends State<_WithdrawalModalSheet> {
                   'Your Balance: ${currentGems.toInt()} Gems (~ \$${(currentGems / 1000).toStringAsFixed(2)})',
                   style: const TextStyle(color: AppColors.goldCoin, fontWeight: FontWeight.bold, fontSize: 13),
                 ),
+                const SizedBox(height: 12),
+
+                // Quick Action Bar: Exchange to Coins & Payout History
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.gemCyan,
+                          side: const BorderSide(color: AppColors.gemCyan),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                        icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                        label: const Text('Exchange to Coins', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          DiamondConversionSheet.show(context);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.goldCoin,
+                          side: const BorderSide(color: AppColors.goldCoin),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                        icon: const Icon(Icons.history_rounded, size: 18),
+                        label: const Text('Payout History', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const WalletTransactionsPage(initialTabIndex: 2),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 16),
 
                 // Gateway Selector
@@ -630,6 +700,18 @@ class _WithdrawalModalSheetState extends State<_WithdrawalModalSheet> {
                       SnackBar(
                         content: Text('Withdrawal request for \$$usdAmount USD submitted to Supabase!'),
                         backgroundColor: AppColors.gemEmerald,
+                        action: SnackBarAction(
+                          label: 'Track Status',
+                          textColor: Colors.white,
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const WalletTransactionsPage(initialTabIndex: 2),
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     );
                   },

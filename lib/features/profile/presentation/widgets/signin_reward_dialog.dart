@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../bloc/profile_bloc.dart';
+import '../bloc/profile_event.dart';
 
 class SignInRewardDialog extends StatefulWidget {
   final VoidCallback? onClaimed;
@@ -19,33 +23,74 @@ class SignInRewardDialog extends StatefulWidget {
 }
 
 class _SignInRewardDialogState extends State<SignInRewardDialog> {
-  int _signedDays = 2;
+  int _signedDays = 1;
   bool _claimedToday = false;
+  bool _isLoading = true;
 
   final List<Map<String, dynamic>> _days = [
-    {'day': 'Day 1', 'coins': '2,000', 'claimed': true},
-    {'day': 'Day 2', 'coins': '2,500', 'claimed': true},
-    {'day': 'Day 3', 'coins': '3,000', 'claimed': false},
-    {'day': 'Day 4', 'coins': '3,500', 'claimed': false},
-    {'day': 'Day 5', 'coins': '4,000', 'claimed': false},
-    {'day': 'Day 6', 'coins': '4,500', 'claimed': false},
-    {'day': 'Day 7+', 'coins': '5,000', 'claimed': false, 'isSpecial': true},
+    {'day': 'Day 1', 'coins': 2000.0, 'isSpecial': false},
+    {'day': 'Day 2', 'coins': 2500.0, 'isSpecial': false},
+    {'day': 'Day 3', 'coins': 3000.0, 'isSpecial': false},
+    {'day': 'Day 4', 'coins': 3500.0, 'isSpecial': false},
+    {'day': 'Day 5', 'coins': 4000.0, 'isSpecial': false},
+    {'day': 'Day 6', 'coins': 4500.0, 'isSpecial': false},
+    {'day': 'Day 7+', 'coins': 5000.0, 'isSpecial': true},
   ];
 
-  void _claimReward() {
-    if (_claimedToday) return;
+  @override
+  void initState() {
+    super.initState();
+    _loadState();
+  }
+
+  Future<void> _loadState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final days = prefs.getInt('royal_signin_days') ?? 0;
+      final lastDate = prefs.getString('royal_signin_last_date') ?? '';
+      final todayStr = DateTime.now().toIso8601String().substring(0, 10);
+
+      if (mounted) {
+        setState(() {
+          _signedDays = days == 0 ? 1 : days;
+          _claimedToday = (lastDate == todayStr);
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _claimReward() async {
+    if (_claimedToday || _isLoading) return;
+
+    final targetIndex = (_signedDays - 1).clamp(0, _days.length - 1);
+    final rewardCoins = _days[targetIndex]['coins'] as double;
+    final todayStr = DateTime.now().toIso8601String().substring(0, 10);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('royal_signin_days', _signedDays);
+    await prefs.setString('royal_signin_last_date', todayStr);
+
+    if (!mounted) return;
+
+    context.read<ProfileBloc>().add(
+          ClaimDailyRewardEvent(
+            dayNumber: _signedDays,
+            rewardCoins: rewardCoins,
+          ),
+        );
 
     setState(() {
-      _signedDays += 1;
       _claimedToday = true;
-      _days[2]['claimed'] = true;
     });
 
     widget.onClaimed?.call();
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('🎉 Claimed 3,000 Coins from Sign-in PK!'),
+      SnackBar(
+        content: Text('🎉 Claimed ${rewardCoins.toInt()} Coins! Saved in Supabase.'),
         backgroundColor: AppColors.gemEmerald,
       ),
     );
@@ -57,6 +102,13 @@ class _SignInRewardDialogState extends State<SignInRewardDialog> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Dialog(
+        backgroundColor: Colors.transparent,
+        child: Center(child: CircularProgressIndicator(color: AppColors.goldCoin)),
+      );
+    }
+
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
@@ -73,7 +125,7 @@ class _SignInRewardDialogState extends State<SignInRewardDialog> {
               borderRadius: BorderRadius.circular(28),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.35),
+                  color: Colors.black.withValues(alpha: 0.35),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -114,7 +166,9 @@ class _SignInRewardDialogState extends State<SignInRewardDialog> {
                   children: List.generate(_days.length, (index) {
                     final item = _days[index];
                     final bool isSpecial = item['isSpecial'] == true;
-                    final bool claimed = item['claimed'] as bool;
+                    final bool isClaimed = index < (_signedDays - (_claimedToday ? 0 : 1));
+                    final bool isCurrent = index == (_signedDays - (_claimedToday ? 1 : 0));
+                    final coins = (item['coins'] as double).toInt();
 
                     return Container(
                       width: isSpecial ? 160 : 68,
@@ -122,19 +176,22 @@ class _SignInRewardDialogState extends State<SignInRewardDialog> {
                       decoration: BoxDecoration(
                         color: isSpecial
                             ? const Color(0xFFFFF7E6)
-                            : (claimed ? const Color(0xFFE8F7F2) : const Color(0xFFF3FAF7)),
+                            : (isClaimed ? const Color(0xFFE8F7F2) : const Color(0xFFF3FAF7)),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: isSpecial
-                              ? AppColors.goldCoin.withOpacity(0.5)
-                              : (claimed
-                                  ? AppColors.gemEmerald.withOpacity(0.4)
-                                  : Colors.transparent),
+                          color: isCurrent
+                              ? AppColors.goldCoin
+                              : (isSpecial
+                                  ? AppColors.goldCoin.withValues(alpha: 0.5)
+                                  : (isClaimed
+                                      ? AppColors.gemEmerald.withValues(alpha: 0.4)
+                                      : Colors.transparent)),
+                          width: isCurrent ? 2 : 1,
                         ),
                       ),
                       child: Stack(
                         children: [
-                          if (claimed)
+                          if (isClaimed)
                             Positioned(
                               top: 0,
                               right: 0,
@@ -169,7 +226,7 @@ class _SignInRewardDialogState extends State<SignInRewardDialog> {
                                     color: AppColors.goldCoin, size: 20),
                                 const SizedBox(height: 2),
                                 Text(
-                                  item['coins'] as String,
+                                  '$coins',
                                   style: TextStyle(
                                     color: isSpecial
                                         ? const Color(0xFFB45309)
@@ -189,20 +246,23 @@ class _SignInRewardDialogState extends State<SignInRewardDialog> {
 
                 const SizedBox(height: 24),
 
-                // Big Orange Button: Sign-in PK
+                // Big Button: Sign-in PK / Claimed
                 GestureDetector(
                   onTap: _claimReward,
                   child: Container(
                     width: double.infinity,
                     height: 50,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFF9900), Color(0xFFFF5500)],
+                      gradient: LinearGradient(
+                        colors: _claimedToday
+                            ? [Colors.grey.shade400, Colors.grey.shade600]
+                            : [const Color(0xFFFF9900), const Color(0xFFFF5500)],
                       ),
                       borderRadius: BorderRadius.circular(25),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFFF5500).withOpacity(0.4),
+                          color: (_claimedToday ? Colors.grey : const Color(0xFFFF5500))
+                              .withValues(alpha: 0.4),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -210,10 +270,10 @@ class _SignInRewardDialogState extends State<SignInRewardDialog> {
                     ),
                     alignment: Alignment.center,
                     child: Text(
-                      _claimedToday ? 'Claimed Today' : 'Sign-in PK',
+                      _claimedToday ? 'Claimed Today ✓' : 'Sign-in & Claim Coins',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 18,
+                        fontSize: 17,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -250,7 +310,7 @@ class _SignInRewardDialogState extends State<SignInRewardDialog> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF109B5B).withOpacity(0.5),
+                        color: const Color(0xFF109B5B).withValues(alpha: 0.5),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),

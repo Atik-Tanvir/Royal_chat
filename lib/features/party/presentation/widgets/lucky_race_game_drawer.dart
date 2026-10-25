@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/config/auth_session_manager.dart';
 import '../../../../core/config/supabase_config.dart';
+import '../../../../core/services/wallet_transaction_service.dart';
+import '../../../profile/domain/entities/wallet_transaction.dart';
 import '../../../profile/presentation/bloc/profile_bloc.dart';
 import '../../../profile/presentation/bloc/profile_event.dart';
 import '../../../profile/presentation/bloc/profile_state.dart';
@@ -78,13 +81,89 @@ class _LuckyRaceGameDrawerState extends State<LuckyRaceGameDrawer> {
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) return;
-      setState(() {
-        if (_secondsRemaining > 1) {
-          _secondsRemaining--;
-        } else {
-          _secondsRemaining = 45; // New round
+      if (_secondsRemaining > 1) {
+        setState(() => _secondsRemaining--);
+      } else {
+        _resolveRaceRound();
+      }
+    });
+  }
+
+  void _resolveRaceRound() async {
+    final random = Random();
+    // Weighted selection: Stock (50%), ATV (35%), SUV (15%)
+    final roll = random.nextInt(100);
+    int winnerIndex = 0;
+    String winnerKey = 'Stock';
+    double multiplier = 1.9;
+
+    if (roll < 50) {
+      winnerIndex = 0;
+      winnerKey = 'Stock';
+      multiplier = 1.9;
+    } else if (roll < 85) {
+      winnerIndex = 1;
+      winnerKey = 'ATV';
+      multiplier = 3.4;
+    } else {
+      winnerIndex = 2;
+      winnerKey = 'SUV';
+      multiplier = 9.9;
+    }
+
+    final userBet = (_lanes[winnerIndex]['myBet'] as int);
+    final winPayout = (userBet * multiplier).round();
+
+    setState(() {
+      _secondsRemaining = 45;
+      _recentWinners.insert(0, winnerKey);
+      if (_recentWinners.length > 5) _recentWinners.removeLast();
+    });
+
+    if (userBet > 0 && winPayout > 0) {
+      final currentUserId = AuthSessionManager.currentUserId;
+      if (currentUserId != null) {
+        try {
+          final profile = context.read<ProfileBloc>().state.profile;
+          final newBalance = profile.coinBalance + winPayout;
+          await SupabaseConfig.client
+              .from('profiles')
+              .update({'coin_balance': newBalance})
+              .eq('id', currentUserId);
+
+          final tx = WalletTransaction(
+            id: 'RW-${DateTime.now().millisecondsSinceEpoch}',
+            userId: currentUserId,
+            type: 'conversion',
+            title: 'Lucky Race Won ($winnerKey $multiplier x)',
+            amount: winPayout.toDouble(),
+            currency: 'coin',
+            status: 'Completed',
+            gateway: 'Lucky Race',
+            createdAt: DateTime.now(),
+          );
+          await WalletTransactionService.recordTransaction(tx);
+
+          if (mounted) {
+            context.read<ProfileBloc>().add(LoadUserProfileEvent());
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('🎉 Congratulations! You won $winPayout coins on $winnerKey!'),
+                backgroundColor: const Color(0xFF10B981),
+              ),
+            );
+          }
+        } catch (e) {
+          debugPrint('[LuckyRace] Payout error: $e');
         }
-      });
+      }
+    }
+
+    // Reset bets for all lanes
+    setState(() {
+      for (final lane in _lanes) {
+        lane['myBet'] = 0;
+      }
     });
   }
 
@@ -125,6 +204,19 @@ class _LuckyRaceGameDrawerState extends State<LuckyRaceGameDrawer> {
           .from('profiles')
           .update({'coin_balance': newBalance})
           .eq('id', currentUserId);
+
+      final tx = WalletTransaction(
+        id: 'RB-${DateTime.now().millisecondsSinceEpoch}',
+        userId: currentUserId,
+        type: 'recharge',
+        title: 'Lucky Race Bet on ${_lanes[_selectedLane]['title']}',
+        amount: _selectedChip.toDouble(),
+        currency: 'coin',
+        status: 'Completed',
+        gateway: 'Lucky Race',
+        createdAt: DateTime.now(),
+      );
+      await WalletTransactionService.recordTransaction(tx);
 
       if (mounted) {
         context.read<ProfileBloc>().add(LoadUserProfileEvent());
