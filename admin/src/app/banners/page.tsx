@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../shared/lib/supabase';
 import { Badge } from '../../shared/components/ui/Badge';
 import { Modal } from '../../shared/components/ui/Modal';
 import { Switch } from '../../shared/components/ui/Switch';
@@ -57,6 +58,34 @@ export default function BannersPage() {
       order: 3,
     },
   ]);
+
+  useEffect(() => {
+    async function loadBanners() {
+      try {
+        const { data } = await supabase
+          .from('banners')
+          .select('*')
+          .order('sort_order', { ascending: true });
+        if (data && data.length > 0) {
+          setBanners(
+            data.map((b: any) => ({
+              id: b.id,
+              title: b.title,
+              subtitle: b.subtitle || '',
+              imageUrl: b.image_url,
+              targetTab: b.target_tab || 'All',
+              actionUrl: b.action_url || '',
+              isActive: b.is_active ?? true,
+              order: b.sort_order || 1,
+            }))
+          );
+        }
+      } catch (err) {
+        console.error('Error fetching banners:', err);
+      }
+    }
+    loadBanners();
+  }, []);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../shared/lib/supabase';
 import { formatCoins, formatUSD } from '../../shared/lib/utils';
 import {
   Trophy,
@@ -25,6 +26,37 @@ export default function LeaderboardsPage() {
   const [activeType, setActiveType] = useState<'Wealth' | 'Game' | 'Charm' | 'Invitation'>('Wealth');
   const [period, setPeriod] = useState<'Daily' | 'Monthly'>('Daily');
   const [country, setCountry] = useState('All');
+
+  useEffect(() => {
+    async function loadLeaderboards() {
+      try {
+        const { data } = await supabase
+          .from('leaderboards')
+          .select('*')
+          .order('rank', { ascending: true });
+        if (data && data.length > 0) {
+          const mapped: LeaderboardUser[] = data.map((item: any, idx: number) => ({
+            rank: item.rank || idx + 1,
+            userId: item.user_id || `user_${idx}`,
+            username: item.user_name || 'Royal Player',
+            avatarUrl: item.user_avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+            flag: item.country_flag || '🇧🇩',
+            country: item.country || 'Bangladesh',
+            gender: '♂ 22',
+            level: 5,
+            score: Number(item.score) || 100000,
+            usdEquivalent: Math.round((Number(item.score) || 100000) / 500000),
+            type: (item.type === 'hourly' ? 'Game' : item.type === 'invites' ? 'Invitation' : 'Wealth') as any,
+            isAnonymous: item.is_anonymous || false,
+          }));
+          setRankings(mapped);
+        }
+      } catch (err) {
+        console.error('Error fetching leaderboards:', err);
+      }
+    }
+    loadLeaderboards();
+  }, []);
 
   const [rankings, setRankings] = useState<LeaderboardUser[]>([
     {

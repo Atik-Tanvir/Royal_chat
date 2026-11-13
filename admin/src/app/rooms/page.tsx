@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase, RoomRecord } from '../../shared/lib/supabase';
 import { Badge } from '../../shared/components/ui/Badge';
 import { Modal } from '../../shared/components/ui/Modal';
@@ -97,6 +97,36 @@ export default function RoomsPage() {
   const [rooms, setRooms] = useState(mockRooms);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
+
+  useEffect(() => {
+    async function loadRooms() {
+      try {
+        const { data } = await supabase
+          .from('rooms')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (data && data.length > 0) {
+          const formatted = data.map((r: any) => ({
+            ...r,
+            seats: r.seats || [
+              { index: 1, userName: r.host_name, isMuted: false, isLocked: false },
+              { index: 2, isMuted: false, isLocked: false },
+              { index: 3, isMuted: false, isLocked: false },
+              { index: 4, isMuted: false, isLocked: false },
+              { index: 5, isMuted: false, isLocked: false },
+              { index: 6, isMuted: false, isLocked: false },
+              { index: 7, isMuted: false, isLocked: false },
+              { index: 8, isMuted: false, isLocked: false },
+            ],
+          }));
+          setRooms(formatted);
+        }
+      } catch (err) {
+        console.error('Error fetching rooms:', err);
+      }
+    }
+    loadRooms();
+  }, []);
 
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
   const [activeRoomAlert, setActiveRoomAlert] = useState<string | null>(

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../shared/lib/supabase';
 import { Badge } from '../../shared/components/ui/Badge';
 import { Modal } from '../../shared/components/ui/Modal';
 import { Switch } from '../../shared/components/ui/Switch';
@@ -88,6 +89,34 @@ export default function GiftsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [editingGiftId, setEditingGiftId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadGifts() {
+      try {
+        const { data } = await supabase
+          .from('gifts')
+          .select('*')
+          .order('price_coins', { ascending: true });
+        if (data && data.length > 0) {
+          setGifts(
+            data.map((g: any) => ({
+              id: g.id,
+              name: g.name,
+              icon: g.icon,
+              category: g.category || 'Popular',
+              priceCoins: g.price_coins,
+              animationType: g.animation_type || 'Static PNG',
+              luckyMultiplier: g.lucky_multiplier || undefined,
+              isActive: g.is_active ?? true,
+            }))
+          );
+        }
+      } catch (err) {
+        console.error('Error fetching gifts:', err);
+      }
+    }
+    loadGifts();
+  }, []);
 
   function openCreateModal() {
     setEditingGiftId(null);
