@@ -11,6 +11,8 @@ import {
   Sliders,
   CheckCircle2,
   Wallet,
+  Copy,
+  Sparkles,
 } from 'lucide-react';
 
 const mockWithdrawals: WithdrawalRecord[] = [
@@ -55,6 +57,28 @@ export default function WithdrawalsPage() {
   const [activeTx, setActiveTx] = useState<WithdrawalRecord | null>(null);
   const [actionType, setActionType] = useState<'approve' | 'reject'>('approve');
   const [proofNote, setProofNote] = useState('');
+  const [copiedTarget, setCopiedTarget] = useState(false);
+
+  function autoGenerateTrxId() {
+    const prefix = activeTx?.gateway?.toUpperCase().includes('BKASH')
+      ? 'BK'
+      : activeTx?.gateway?.toUpperCase().includes('NAGAD')
+      ? 'NG'
+      : activeTx?.gateway?.toUpperCase().includes('USDT')
+      ? 'TX'
+      : 'TRX';
+    const rand = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const timePart = Date.now().toString(36).substring(3).toUpperCase();
+    setProofNote(`${prefix}_${timePart}${rand}`);
+  }
+
+  function copyDestination() {
+    const target = activeTx?.account_number || activeTx?.gateway || '';
+    if (!target) return;
+    navigator.clipboard.writeText(target);
+    setCopiedTarget(true);
+    setTimeout(() => setCopiedTarget(false), 2000);
+  }
 
   const [gateways, setGateways] = useState({
     bKash: true,
@@ -331,23 +355,50 @@ export default function WithdrawalsPage() {
           title={`${actionType === 'approve' ? 'Approve' : 'Reject'}: ${activeTx.id}`}
         >
           <form onSubmit={handleDecisionSubmit} className="space-y-4">
-            <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs space-y-1">
-              <p>Host: <strong className="text-white">{activeTx.user_name}</strong></p>
-              <p>Amount: <strong className="text-emerald-400">{formatUSD(activeTx.amount)}</strong></p>
-              <p>Destination: <strong className="text-slate-300">{activeTx.gateway}</strong></p>
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs space-y-1.5">
+              <p>User: <strong className="text-white">{activeTx.user_name}</strong> <span className="text-[10px] text-slate-500 font-mono">({activeTx.user_id})</span></p>
+              <p>Amount: <strong className="text-emerald-400 font-bold">{formatUSD(activeTx.amount)}</strong> <span className="text-cyan-400">({formatGems(activeTx.gems)} gems)</span></p>
+              <div className="flex items-center justify-between pt-1 border-t border-white/5">
+                <p>
+                  Destination:{' '}
+                  <strong className="text-amber-400 font-mono">
+                    {activeTx.account_number || activeTx.gateway}
+                  </strong>
+                </p>
+                <button
+                  type="button"
+                  onClick={copyDestination}
+                  className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-slate-300 text-[10px] font-bold flex items-center gap-1 transition-colors"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>{copiedTarget ? 'Copied!' : 'Copy'}</span>
+                </button>
+              </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">
-                {actionType === 'approve' ? 'Reference / TRXID' : 'Reason'}
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-300">
+                  {actionType === 'approve' ? 'Transaction ID / Proof' : 'Rejection Reason'}
+                </label>
+                {actionType === 'approve' && (
+                  <button
+                    type="button"
+                    onClick={autoGenerateTrxId}
+                    className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 transition-colors"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>Auto-Generate</span>
+                  </button>
+                )}
+              </div>
               <input
                 type="text"
                 required
                 value={proofNote}
                 onChange={(e) => setProofNote(e.target.value)}
-                placeholder={actionType === 'approve' ? 'TRXID' : 'Reason'}
-                className="w-full px-3.5 py-2 rounded-xl bg-black/40 border border-[#1C3830] text-sm text-white focus:outline-none focus:border-emerald-500"
+                placeholder={actionType === 'approve' ? 'e.g. BLM98765432 or click Auto-Generate' : 'e.g. Invalid account details'}
+                className="w-full px-3.5 py-2 rounded-xl bg-black/40 border border-[#1C3830] text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
               />
             </div>
 
