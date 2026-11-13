@@ -7,6 +7,7 @@ import '../../../../core/widgets/custom_avatar.dart';
 import '../../../../core/widgets/royal_brand_logo.dart';
 import '../../domain/entities/party_room.dart';
 import '../widgets/lucky_race_game_drawer.dart';
+import '../../../games/presentation/pages/bucket_prediction_game_page.dart';
 import '../widgets/user_profile_popover.dart';
 import '../../../profile/presentation/pages/coins_wallet_page.dart';
 import '../../../chat/presentation/pages/conversation_page.dart';
@@ -1165,6 +1166,20 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
             color: _isMicMuted ? Colors.redAccent : AppColors.gemEmerald,
             onTap: _toggleMic,
           ),
+          const SizedBox(width: 6),
+          // 8-Item Bucket Group Game trigger
+          _buildCircleAction(
+            icon: Icons.gamepad_rounded,
+            color: const Color(0xFF8B5CF6),
+            onTap: () {
+              BucketPredictionGamePage.showGroupDrawer(
+                context,
+                roomId: widget.room.id,
+                roomName: widget.room.title,
+              );
+            },
+          ),
+          const SizedBox(width: 6),
           // Lucky Race Mini-game trigger
           _buildCircleAction(
             icon: Icons.sports_score_rounded,
@@ -1181,7 +1196,7 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
               );
             },
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 6),
 
           // Gift Button (Golden box)
           _buildCircleAction(

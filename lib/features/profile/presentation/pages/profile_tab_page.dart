@@ -18,6 +18,10 @@ import 'wallet_transactions_page.dart';
 import '../widgets/diamond_conversion_sheet.dart';
 import '../../../leaderboard/presentation/pages/leaderboard_page.dart';
 import '../../../auth/presentation/pages/login_page.dart';
+import 'task_center_page.dart';
+import 'backpack_store_page.dart';
+import '../../../games/presentation/pages/bucket_prediction_game_page.dart';
+import '../../../moments/presentation/pages/social_profile_page.dart';
 
 class ProfileTabPage extends StatelessWidget {
   const ProfileTabPage({super.key});
@@ -43,6 +47,8 @@ class ProfileTabPage extends StatelessWidget {
                 WithdrawalTickerWidget(text: state.recentWithdrawalText),
                 const SizedBox(height: 16),
                 _buildFirstRechargeBanner(context),
+                const SizedBox(height: 16),
+                _buildGemgalaFeatureRow(context),
                 const SizedBox(height: 20),
                 _buildMenuList(context),
                 const SizedBox(height: 24),
@@ -389,6 +395,125 @@ class ProfileTabPage extends StatelessWidget {
     );
   }
 
+  
+  Widget _buildGemgalaFeatureRow(BuildContext context) {
+    return Row(
+      children: [
+        _buildFeatureCard(
+          context: context,
+          icon: Icons.assignment_turned_in_rounded,
+          title: 'Tasks',
+          subtitle: 'Chests 🎁',
+          color: const Color(0xFF00E676),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TaskCenterPage()),
+            );
+          },
+        ),
+        const SizedBox(width: 10),
+        _buildFeatureCard(
+          context: context,
+          icon: Icons.gamepad_rounded,
+          title: 'Bucket Spin',
+          subtitle: 'Win 2x 🪣',
+          color: const Color(0xFFF59E0B),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BucketPredictionGamePage()),
+            );
+          },
+        ),
+        const SizedBox(width: 10),
+        _buildFeatureCard(
+          context: context,
+          icon: Icons.storefront_rounded,
+          title: 'Store',
+          subtitle: 'Rides 👑',
+          color: const Color(0xFF00E5FF),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BackpackStorePage()),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFeatureCard({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                color.withValues(alpha: 0.18),
+                const Color(0xFF071C15),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withValues(alpha: 0.35), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.12),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildMenuList(BuildContext context) {
     return Material(
       color: Colors.black12,
@@ -396,6 +521,36 @@ class ProfileTabPage extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
+          _buildMenuItem(
+            icon: Icons.dynamic_feed_rounded,
+            iconColor: AppColors.accentOrange,
+            title: 'My Social Profile (Posts & Stories)',
+            trailingWidget: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.accentOrange.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.accentOrange, width: 0.8),
+                  ),
+                  child: const Text(
+                    'Moments',
+                    style: TextStyle(color: AppColors.accentOrange, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Colors.white54, size: 20),
+              ],
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SocialProfilePage()),
+              );
+            },
+          ),
+          Divider(color: Colors.white.withOpacity(0.06), height: 1),
           _buildMenuItem(
             icon: Icons.person_add_rounded,
             iconColor: AppColors.gemEmerald,
@@ -440,6 +595,96 @@ class ProfileTabPage extends StatelessWidget {
             title: 'Sign-in PK',
             onTap: () {
               SignInRewardDialog.show(context);
+            },
+          ),
+          Divider(color: Colors.white.withOpacity(0.06), height: 1),
+          _buildMenuItem(
+            icon: Icons.assignment_turned_in_rounded,
+            iconColor: const Color(0xFF00E676),
+            title: 'Task Center (Daily Missions)',
+            trailingWidget: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00E676).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF00E676), width: 0.8),
+                  ),
+                  child: const Text(
+                    'Chests 🎁',
+                    style: TextStyle(color: Color(0xFF00E676), fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Colors.white54, size: 20),
+              ],
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TaskCenterPage()),
+              );
+            },
+          ),
+          Divider(color: Colors.white.withOpacity(0.06), height: 1),
+          _buildMenuItem(
+            icon: Icons.gamepad_rounded,
+            iconColor: const Color(0xFFF59E0B),
+            title: 'Bucket Spin (8-Item Prediction)',
+            trailingWidget: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFF59E0B), width: 0.8),
+                  ),
+                  child: const Text(
+                    'Win 2x 🪣',
+                    style: TextStyle(color: Color(0xFFF59E0B), fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Colors.white54, size: 20),
+              ],
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BucketPredictionGamePage()),
+              );
+            },
+          ),
+          Divider(color: Colors.white.withOpacity(0.06), height: 1),
+          _buildMenuItem(
+            icon: Icons.storefront_rounded,
+            iconColor: const Color(0xFF00E5FF),
+            title: 'Backpack & Mall (Frames & Rides)',
+            trailingWidget: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF00E5FF), width: 0.8),
+                  ),
+                  child: const Text(
+                    'VIP 👑',
+                    style: TextStyle(color: Color(0xFF00E5FF), fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Colors.white54, size: 20),
+              ],
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BackpackStorePage()),
+              );
             },
           ),
           Divider(color: Colors.white.withOpacity(0.06), height: 1),

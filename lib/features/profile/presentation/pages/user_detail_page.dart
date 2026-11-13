@@ -6,6 +6,7 @@ import '../../../../core/config/auth_session_manager.dart';
 import '../../../../core/services/r2_storage_service.dart';
 import '../../../../core/widgets/custom_avatar.dart';
 import '../../../../core/widgets/royal_brand_logo.dart';
+import '../../../calls/presentation/pages/one_on_one_call_page.dart';
 import '../bloc/profile_bloc.dart';
 import '../bloc/profile_event.dart';
 import '../bloc/profile_state.dart';
@@ -394,6 +395,14 @@ class _UserDetailPageState extends State<UserDetailPage> with SingleTickerProvid
                   ),
                 ),
               ),
+
+              // Bottom Action Bar for 1v1 Calls
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: _buildBottomCallBar(context, currentUsername, currentAvatar),
+              ),
             ],
           ),
         );
@@ -403,7 +412,7 @@ class _UserDetailPageState extends State<UserDetailPage> with SingleTickerProvid
 
   Widget _buildInfoTab(dynamic profile, String name, String avatar) {
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
       children: [
         // Avatar + Name + Gender/Age Row
         Row(
@@ -577,6 +586,93 @@ class _UserDetailPageState extends State<UserDetailPage> with SingleTickerProvid
       child: Text(
         label,
         style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
+      ),
+    );
+  }
+
+  Widget _buildBottomCallBar(BuildContext context, String currentUsername, String currentAvatar) {
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF031A14).withValues(alpha: 0.95),
+        border: const Border(
+          top: BorderSide(color: Color(0xFF1C3830), width: 1.5),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.6),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Voice Call Button
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => OneOnOneCallPage(
+                      calleeId: widget.userId.isNotEmpty ? widget.userId : 'user_target',
+                      calleeName: currentUsername,
+                      calleeAvatar: currentAvatar,
+                      calleeCountry: widget.countryFlag,
+                      isVideoCall: false,
+                      gemsPerMinute: 120,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.call_rounded, size: 18),
+              label: const Text('Voice (120 💎/m)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0D5E42),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: AppColors.gemEmerald, width: 1),
+                ),
+                elevation: 0,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Video Call Button
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => OneOnOneCallPage(
+                      calleeId: widget.userId.isNotEmpty ? widget.userId : 'user_target',
+                      calleeName: currentUsername,
+                      calleeAvatar: currentAvatar,
+                      calleeCountry: widget.countryFlag,
+                      isVideoCall: true,
+                      gemsPerMinute: 240,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.videocam_rounded, size: 20),
+              label: const Text('Video (240 💎/m)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.goldCoin,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 3,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

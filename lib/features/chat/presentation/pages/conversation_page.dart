@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../calls/presentation/pages/one_on_one_call_page.dart';
 import '../../domain/entities/chat_item.dart';
 import '../bloc/chat_bloc.dart';
 import '../bloc/chat_event.dart';
@@ -39,6 +40,45 @@ class _ConversationPageState extends State<ConversationPage> {
         title: Text(widget.chat.title, style: AppTextStyles.titleBold),
         backgroundColor: AppColors.bottomNavBg,
         elevation: 1,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.call_rounded, color: AppColors.gemEmerald),
+            tooltip: '1v1 Voice Call (120 💎/m)',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => OneOnOneCallPage(
+                    calleeId: widget.chat.id,
+                    calleeName: widget.chat.title,
+                    calleeAvatar: widget.chat.avatarUrl ?? '',
+                    isVideoCall: false,
+                    gemsPerMinute: 120,
+                  ),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.videocam_rounded, color: AppColors.goldCoin),
+            tooltip: '1v1 Video Call (240 💎/m)',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => OneOnOneCallPage(
+                    calleeId: widget.chat.id,
+                    calleeName: widget.chat.title,
+                    calleeAvatar: widget.chat.avatarUrl ?? '',
+                    isVideoCall: true,
+                    gemsPerMinute: 240,
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
       body: Column(
         children: [

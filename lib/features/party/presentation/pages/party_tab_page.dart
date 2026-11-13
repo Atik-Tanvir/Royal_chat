@@ -10,15 +10,20 @@ import '../bloc/party_event.dart';
 import '../bloc/party_state.dart';
 import '../widgets/party_category_bar.dart';
 import '../widgets/party_room_card.dart';
+import '../widgets/single_chat_card.dart';
+import '../../domain/entities/party_room.dart';
 import '../widgets/create_room_dialog.dart';
 import '../widgets/room_restriction_dialog.dart';
 import 'live_audio_room_page.dart';
 import 'region_selector_page.dart';
+import '../../../profile/presentation/widgets/signin_reward_dialog.dart';
+import '../../../profile/presentation/pages/task_center_page.dart';
+import '../../../profile/presentation/pages/backpack_store_page.dart';
+import '../../../games/presentation/pages/bucket_prediction_game_page.dart';
 import '../../../leaderboard/presentation/pages/leaderboard_page.dart';
 import '../../../profile/presentation/pages/coins_wallet_page.dart';
 import '../../../profile/presentation/bloc/profile_bloc.dart';
 import '../../../profile/presentation/bloc/profile_state.dart';
-import '../../../chat/presentation/pages/system_messages_page.dart';
 
 class PartyTabPage extends StatelessWidget {
   const PartyTabPage({super.key});
@@ -59,19 +64,169 @@ class PartyTabPage extends StatelessWidget {
                         },
                       ),
                       const SizedBox(width: 4),
-                      IconButton(
-                        icon: const Icon(Icons.mail_outline_rounded, color: AppColors.goldCoin, size: 22),
-                        onPressed: () {
+                      const SizedBox(width: 6),
+                      // Daily Sign-in Reward Calendar Icon (Next to award)
+                      GestureDetector(
+                        onTap: () {
+                          SignInRewardDialog.show(context);
+                        },
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(
+                              color: const Color(0xFFFFE082),
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.calendar_month_rounded,
+                              color: Colors.white,
+                              size: 19,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // 8-Item Bucket Game Quick Icon
+                      GestureDetector(
+                        onTap: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => const SystemMessagesPage(),
-                            ),
+                            MaterialPageRoute(builder: (_) => const BucketPredictionGamePage()),
                           );
                         },
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFF9100), Color(0xFFFF3D00)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(
+                              color: const Color(0xFFFFD180),
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFF3D00).withValues(alpha: 0.35),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.stars_rounded,
+                              color: Colors.white,
+                              size: 19,
+                            ),
+                          ),
+                        ),
                       ),
+                      const SizedBox(width: 6),
+                      // Task Center Quick Icon
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const TaskCenterPage()),
+                          );
+                        },
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(
+                              color: const Color(0xFFB9F6CA),
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF00E676).withValues(alpha: 0.35),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.assignment_turned_in_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // Mall & Backpack Quick Icon
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const BackpackStorePage()),
+                          );
+                        },
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF8E24AA), Color(0xFFE91E63)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(
+                              color: const Color(0xFFF48FB1),
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFE91E63).withValues(alpha: 0.35),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              Icons.storefront_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // Award / Leaderboard Trophy Icon
                       IconButton(
-                        icon: const Icon(Icons.emoji_events_rounded, color: AppColors.goldCoin, size: 22),
+                        icon: const Icon(Icons.emoji_events_rounded, color: AppColors.goldCoin, size: 26),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                         onPressed: () {
                           Navigator.push(
                             context,
@@ -286,10 +441,13 @@ class PartyTabPage extends StatelessWidget {
                 ),
               ),
 
-              // Category Horizontal Icon Row
+              // Category Horizontal Icon Row (Only shown when Party sub-tab is active)
               SliverToBoxAdapter(
                 child: BlocBuilder<PartyBloc, PartyState>(
                   builder: (context, state) {
+                    if (state.selectedSubTab != 'Party') {
+                      return const SizedBox.shrink();
+                    }
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: PartyCategoryBar(
@@ -312,6 +470,11 @@ class PartyTabPage extends StatelessWidget {
                         child: CircularProgressIndicator(color: AppColors.gemEmerald),
                       ),
                     );
+                  }
+
+                  // Single Host 2-column view when "Chat" tab is selected (Matches Gamegala Single Host layout)
+                  if (state.selectedSubTab == 'Chat') {
+                    return _buildSingleChatGrid(context);
                   }
 
                   // If a specific category filter is picked, show flat grid
@@ -403,7 +566,7 @@ class PartyTabPage extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 13),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFFFFDF00), Color(0xFFF59E0B)],
+                      colors: [Color(0xFF00E676), Color(0xFF00B0FF)],
                     ),
                     borderRadius: BorderRadius.circular(30),
                     border: Border.all(color: Colors.white.withValues(alpha: 0.8), width: 1.5),
@@ -418,10 +581,10 @@ class PartyTabPage extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.mic_none_rounded, color: Colors.black87, size: 22),
+                      const Icon(Icons.sports_esports_rounded, color: Colors.black87, size: 22),
                       const SizedBox(width: 8),
                       Text(
-                        'Host Royal Party',
+                        'Create a Room',
                         style: AppTextStyles.titleBold.copyWith(
                           color: Colors.black,
                           fontSize: 15,
@@ -532,6 +695,51 @@ class PartyTabPage extends StatelessWidget {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSingleChatGrid(BuildContext context) {
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 90),
+      sliver: SliverGrid(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 0.88,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final host = dummySingleChatHosts[index % dummySingleChatHosts.length];
+            return SingleChatCard(
+              host: host,
+              onTap: () => _openHostSession(context, host),
+              onCallTap: () => _openHostSession(context, host),
+            );
+          },
+          childCount: dummySingleChatHosts.length,
+        ),
+      ),
+    );
+  }
+
+  void _openHostSession(BuildContext context, SingleChatHost host) {
+    final hostRoom = PartyRoom(
+      id: host.id,
+      title: '${host.name}\'s Live Chat',
+      hostName: host.name,
+      hostAvatar: host.avatarUrl,
+      countryFlag: host.countryFlag,
+      onlineCount: 1,
+      category: 'Chatroom',
+      seatedAvatars: [host.avatarUrl],
+      isLive: host.isOnline,
+    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LiveAudioRoomPage(room: hostRoom),
       ),
     );
   }

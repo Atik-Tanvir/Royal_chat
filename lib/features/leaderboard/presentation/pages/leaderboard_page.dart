@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/widgets/gemgala_background.dart';
 import '../../../../core/widgets/custom_avatar.dart';
+import '../../../party/presentation/pages/region_selector_page.dart';
 import '../../domain/entities/leaderboard_entry.dart';
 import '../bloc/leaderboard_bloc.dart';
 import '../bloc/leaderboard_event.dart';
@@ -33,14 +33,47 @@ class LeaderboardPage extends StatelessWidget {
   }
 }
 
-class _LeaderboardView extends StatelessWidget {
+class _LeaderboardView extends StatefulWidget {
   const _LeaderboardView();
+
+  @override
+  State<_LeaderboardView> createState() => _LeaderboardViewState();
+}
+
+class _LeaderboardViewState extends State<_LeaderboardView> {
+  String _selectedRegion = 'All';
+
+  static const Map<String, String> _countryToFlag = {
+    'All': '🌐',
+    'Bangladesh': '🇧🇩',
+    'Saudi Arabia': '🇸🇦',
+    'United Arab Emirates': '🇦🇪',
+    'Qatar': '🇶🇦',
+    'Kuwait': '🇰🇼',
+    'India': '🇮🇳',
+    'Pakistan': '🇵🇰',
+    'Philippines': '🇵🇭',
+    'Indonesia': '🇮🇩',
+    'Malaysia': '🇲🇾',
+    'United States': '🇺🇸',
+    'Nepal': '🇳🇵',
+    'Jordan': '🇯🇴',
+    'China': '🇨🇳',
+    'Brazil': '🇧🇷',
+  };
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.darkEmerald,
-      body: GemgalaBackground(
+      backgroundColor: const Color(0xFF00BFA5),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF00B4D8), Color(0xFF00C9A7)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
         child: SafeArea(
           bottom: false,
           child: Column(
@@ -49,17 +82,32 @@ class _LeaderboardView extends StatelessWidget {
               _buildTimeframeToggle(context),
               const SizedBox(height: 8),
               Expanded(
-                child: BlocBuilder<LeaderboardBloc, LeaderboardState>(
-                  builder: (context, state) {
-                    return ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 90),
-                      itemCount: state.entries.length,
-                      itemBuilder: (context, index) {
-                        final entry = state.entries[index];
-                        return _buildRankRow(entry);
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                    child: BlocBuilder<LeaderboardBloc, LeaderboardState>(
+                      builder: (context, state) {
+                        final flag = _countryToFlag[_selectedRegion];
+                        final filteredEntries = (_selectedRegion == 'All' || flag == null)
+                            ? state.entries
+                            : state.entries.where((e) => e.flagEmoji == flag).toList();
+                        final displayList = filteredEntries.isEmpty ? state.entries : filteredEntries;
+
+                        return ListView.builder(
+                          padding: const EdgeInsets.only(top: 8, bottom: 90),
+                          itemCount: displayList.length,
+                          itemBuilder: (context, index) {
+                            final entry = displayList[index];
+                            return _buildRankRow(entry);
+                          },
+                        );
                       },
-                    );
-                  },
+                    ),
+                  ),
                 ),
               ),
               _buildStickyUserFooter(context),
@@ -81,7 +129,7 @@ class _LeaderboardView extends StatelessWidget {
         ];
 
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(
             children: [
               IconButton(
@@ -105,8 +153,8 @@ class _LeaderboardView extends StatelessWidget {
                           Text(
                             tab['title'] as String,
                             style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.white60,
-                              fontSize: isSelected ? 18 : 15,
+                              color: isSelected ? Colors.white : Colors.white70,
+                              fontSize: isSelected ? 17 : 14,
                               fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                             ),
                           ),
@@ -128,8 +176,57 @@ class _LeaderboardView extends StatelessWidget {
                   }).toList(),
                 ),
               ),
-              const Icon(Icons.public_rounded, color: Colors.white70, size: 22),
-              const SizedBox(width: 8),
+              // Globe / Country Selector (Circled in user screenshot)
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => RegionSelectorPage(
+                        selectedRegion: _selectedRegion,
+                        onSelectRegion: (region) {
+                          setState(() {
+                            _selectedRegion = region;
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Region: $region'),
+                              duration: const Duration(milliseconds: 900),
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: AppColors.gemEmerald,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: _selectedRegion != 'All' ? AppColors.goldCoin : Colors.white30,
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _countryToFlag[_selectedRegion] ?? '🌐',
+                        style: const TextStyle(fontSize: 15),
+                      ),
+                      if (_selectedRegion != 'All') ...[
+                        const SizedBox(width: 3),
+                        const Icon(Icons.arrow_drop_down, color: Colors.white, size: 16),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
             ],
           ),
         );
@@ -146,7 +243,7 @@ class _LeaderboardView extends StatelessWidget {
           margin: const EdgeInsets.symmetric(horizontal: 48, vertical: 6),
           height: 38,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.12),
+            color: Colors.white.withOpacity(0.15),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
@@ -167,7 +264,7 @@ class _LeaderboardView extends StatelessWidget {
                     child: Text(
                       'Daily',
                       style: TextStyle(
-                        color: isDaily ? AppColors.darkEmerald : Colors.white70,
+                        color: isDaily ? const Color(0xFF00BFA5) : Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
@@ -191,7 +288,7 @@ class _LeaderboardView extends StatelessWidget {
                     child: Text(
                       'Monthly',
                       style: TextStyle(
-                        color: !isDaily ? AppColors.darkEmerald : Colors.white70,
+                        color: !isDaily ? const Color(0xFF00BFA5) : Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
@@ -218,31 +315,23 @@ class _LeaderboardView extends StatelessWidget {
       rankBadge = Text(
         '${entry.rank}',
         style: const TextStyle(
-          color: Colors.white70,
+          color: Color(0xFF64748B),
           fontWeight: FontWeight.bold,
-          fontSize: 16,
+          fontSize: 15,
         ),
       );
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: entry.rank <= 3
-              ? (entry.rank == 1
-                  ? AppColors.goldCoin.withOpacity(0.3)
-                  : Colors.white.withOpacity(0.15))
-              : Colors.transparent,
-        ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      decoration: const BoxDecoration(
+        color: Colors.white,
       ),
       child: Row(
         children: [
           SizedBox(
-            width: 32,
+            width: 28,
             child: Center(child: rankBadge),
           ),
           const SizedBox(width: 8),
@@ -251,7 +340,7 @@ class _LeaderboardView extends StatelessWidget {
             radius: 20,
             hasVipFrame: entry.isVip,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,7 +348,7 @@ class _LeaderboardView extends StatelessWidget {
                 Text(
                   entry.username,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF1E293B),
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
@@ -317,7 +406,7 @@ class _LeaderboardView extends StatelessWidget {
                   Text(
                     entry.amountFormatted,
                     style: TextStyle(
-                      color: entry.isGems ? AppColors.gemCyan : AppColors.goldCoin,
+                      color: entry.isGems ? const Color(0xFF00B4D8) : const Color(0xFFF59E0B),
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
                     ),
@@ -325,7 +414,7 @@ class _LeaderboardView extends StatelessWidget {
                   const SizedBox(width: 4),
                   Icon(
                     entry.isGems ? Icons.diamond : Icons.monetization_on,
-                    color: entry.isGems ? AppColors.gemCyan : AppColors.goldCoin,
+                    color: entry.isGems ? const Color(0xFF00B4D8) : const Color(0xFFF59E0B),
                     size: 14,
                   ),
                 ],
@@ -334,7 +423,7 @@ class _LeaderboardView extends StatelessWidget {
               Text(
                 '≈\$${entry.usdEquivalent.toStringAsFixed(0)}',
                 style: const TextStyle(
-                  color: Colors.white54,
+                  color: Color(0xFF94A3B8),
                   fontSize: 11,
                 ),
               ),
@@ -349,17 +438,17 @@ class _LeaderboardView extends StatelessWidget {
     return BlocBuilder<LeaderboardBloc, LeaderboardState>(
       builder: (context, state) {
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF063327),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: const BoxDecoration(
+            color: Colors.white,
             border: Border(
-              top: BorderSide(color: Colors.white.withOpacity(0.1)),
+              top: BorderSide(color: Color(0xFFE2E8F0)),
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.5),
-                blurRadius: 10,
-                offset: const Offset(0, -4),
+                color: Color(0x10000000),
+                blurRadius: 8,
+                offset: Offset(0, -3),
               ),
             ],
           ),
@@ -375,57 +464,68 @@ class _LeaderboardView extends StatelessWidget {
                   Text(
                     '${state.myRank}+',
                     style: const TextStyle(
-                      color: Colors.white70,
+                      color: Color(0xFF64748B),
                       fontWeight: FontWeight.bold,
-                      fontSize: 15,
+                      fontSize: 14,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   CustomAvatar(
                     imageUrl: myProfile.avatarUrl.isNotEmpty ? myProfile.avatarUrl : null,
-                    radius: 18,
+                    radius: 17,
                   ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        myProfile.nickname.isNotEmpty ? myProfile.nickname : 'Me',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          Text(
-                            balanceStr,
-                            style: const TextStyle(
-                              color: AppColors.goldCoin,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          myProfile.nickname.isNotEmpty ? myProfile.nickname : 'Me',
+                          style: const TextStyle(
+                            color: Color(0xFF1E293B),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
                           ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.monetization_on, color: AppColors.goldCoin, size: 12),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  const Text(
-                    'Anonymous',
-                    style: TextStyle(color: Colors.white60, fontSize: 13),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              balanceStr,
+                              style: const TextStyle(
+                                color: Color(0xFFF59E0B),
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 3),
+                            const Icon(Icons.monetization_on, color: Color(0xFFF59E0B), size: 12),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(width: 6),
-                  Switch(
-                    value: state.isAnonymous,
-                    activeColor: AppColors.gemEmerald,
-                    onChanged: (_) {
-                      context.read<LeaderboardBloc>().add(ToggleAnonymousEvent());
-                    },
+                  const Text(
+                    'Anonymous',
+                    style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                  ),
+                  const SizedBox(width: 4),
+                  SizedBox(
+                    height: 26,
+                    child: FittedBox(
+                      fit: BoxFit.contain,
+                      child: Switch(
+                        value: state.isAnonymous,
+                        activeColor: const Color(0xFF10B981),
+                        onChanged: (_) {
+                          context.read<LeaderboardBloc>().add(ToggleAnonymousEvent());
+                        },
+                      ),
+                    ),
                   ),
                 ],
               );

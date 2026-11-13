@@ -8,3 +8,4 @@ analyzer:
     - build/**
     - android/**
     - windows/**
+    - web/**

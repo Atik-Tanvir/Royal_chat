@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,6 +6,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/r2_storage_service.dart';
 import '../bloc/moments_bloc.dart';
 import '../bloc/moments_event.dart';
+import '../widgets/moment_media_image.dart';
 
 class CreateMomentPage extends StatefulWidget {
   const CreateMomentPage({super.key});
@@ -19,6 +19,7 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
   final TextEditingController _textController = TextEditingController();
   final List<String> _attachedImages = [];
   bool _isUploading = false;
+  bool _shareToStory = false;
   String? _selectedTopic;
   String? _selectedLocation;
 
@@ -40,18 +41,25 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
     String fullContent = text;
     if (_selectedTopic != null) fullContent += ' #$_selectedTopic';
 
+    final category = (_selectedTopic == 'TikTokReels' || _selectedTopic == 'Video')
+        ? 'Video'
+        : (_selectedTopic ?? 'Moments');
+
     context.read<MomentsBloc>().add(
           CreateMomentEvent(
             content: fullContent,
             imageUrls: _attachedImages,
-            category: _selectedTopic ?? 'Moments',
+            category: category,
             location: _selectedLocation,
+            shareToStory: _shareToStory,
           ),
         );
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('✨ Moment published successfully to Supabase!'),
+      SnackBar(
+        content: Text(_shareToStory
+            ? '✨ Moment & Story published!'
+            : '✨ Moment published!'),
         backgroundColor: AppColors.gemEmerald,
       ),
     );
@@ -137,37 +145,11 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
   }
 
   Widget _buildImagePreview(String urlOrDataUri) {
-    if (urlOrDataUri.startsWith('data:image')) {
-      try {
-        final commaIdx = urlOrDataUri.indexOf(',');
-        final base64String = commaIdx != -1 ? urlOrDataUri.substring(commaIdx + 1) : urlOrDataUri;
-        return Image.memory(
-          base64Decode(base64String),
-          fit: BoxFit.cover,
-          width: 90,
-          height: 90,
-        );
-      } catch (_) {
-        return Container(
-          width: 90,
-          height: 90,
-          color: const Color(0xFFE2E8F0),
-          child: const Icon(Icons.broken_image, color: Colors.grey),
-        );
-      }
-    }
-
-    return Image.network(
-      urlOrDataUri,
-      fit: BoxFit.cover,
+    return MomentMediaImage(
+      source: urlOrDataUri,
       width: 90,
       height: 90,
-      errorBuilder: (_, __, ___) => Container(
-        width: 90,
-        height: 90,
-        color: const Color(0xFFE2E8F0),
-        child: const Icon(Icons.broken_image, color: Colors.grey),
-      ),
+      fit: BoxFit.cover,
     );
   }
 
@@ -275,6 +257,30 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
             const SizedBox(height: 8),
             const Divider(color: Color(0xFFF1F5F9)),
             const SizedBox(height: 16),
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F7F4),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: SwitchListTile.adaptive(
+                value: _shareToStory,
+                activeColor: AppColors.accentOrange,
+                onChanged: (v) => setState(() => _shareToStory = v),
+                title: const Text(
+                  'Also Share to My 24h Story',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: AppColors.textDark,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Highlight this status & photo in top Stories bar',
+                  style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
 
             // Attached Media Grid
             Wrap(
@@ -367,7 +373,7 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
   }
 
   void _showTopicSelector() {
-    final topics = ['RoyalParty', 'VoiceRoom', 'LuckyRace', 'MusicLive', 'Hangout'];
+    final topics = ['TikTokReels', 'Video', 'RoyalParty', 'VoiceRoom', 'LuckyRace', 'MusicLive', 'Hangout'];
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(

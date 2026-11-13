@@ -181,11 +181,11 @@ class CoinsWalletPage extends StatelessWidget {
                       },
                     ),
 
-                    // 3. BlockMe Challenge
+                    // 3. Bucket Prediction Game Challenge
                     _buildTaskTile(
-                      iconEmoji: '🧩',
-                      title: 'Play BlockMe Puzzle',
-                      subtitle: '4-Line Clear to earn 50,000 🪙',
+                      iconEmoji: '🪣',
+                      title: 'Play Bucket Spin (8-Item)',
+                      subtitle: 'Win 2x Coins every 35s 🪙',
                       onTap: () {
                         Navigator.pop(context);
                       },

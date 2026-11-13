@@ -204,47 +204,93 @@ class _MomentCommentsSheetState extends State<MomentCommentsSheet> {
             ),
             child: SafeArea(
               top: false,
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Colors.white12),
-                      ),
-                      child: TextField(
-                        controller: _commentController,
-                        style: const TextStyle(color: Colors.white, fontSize: 14),
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => _submitComment(),
-                        decoration: const InputDecoration(
-                          hintText: 'Add a comment...',
-                          hintStyle: TextStyle(color: Colors.white38, fontSize: 14),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(vertical: 10),
-                        ),
-                      ),
+                  SizedBox(
+                    height: 30,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: ['🔥 Nice!', '❤️ Love it!', '👑 Congrats!', '🎉 GG!', '😂 Haha']
+                          .map(
+                            (chip) => Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: GestureDetector(
+                                onTap: () {
+                                  context.read<MomentsBloc>().add(
+                                        AddCommentEvent(
+                                          postId: widget.post.id,
+                                          text: chip,
+                                        ),
+                                      );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: Colors.white12),
+                                  ),
+                                  child: Text(
+                                    chip,
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: _submitComment,
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [AppColors.accentOrangeLight, AppColors.accentOrange],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: Colors.white12),
+                          ),
+                          child: TextField(
+                            controller: _commentController,
+                            style: const TextStyle(color: Colors.white, fontSize: 14),
+                            textInputAction: TextInputAction.send,
+                            onSubmitted: (_) => _submitComment(),
+                            decoration: const InputDecoration(
+                              hintText: 'Add a comment...',
+                              hintStyle: TextStyle(color: Colors.white38, fontSize: 14),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(vertical: 10),
+                            ),
+                          ),
                         ),
-                        shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
-                    ),
+                      const SizedBox(width: 10),
+                      GestureDetector(
+                        onTap: _submitComment,
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [AppColors.accentOrangeLight, AppColors.accentOrange],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -261,6 +307,7 @@ class _MomentCommentsSheetState extends State<MomentCommentsSheet> {
       children: [
         CustomAvatar(
           imageUrl: comment.userAvatar,
+          fallbackName: comment.userName,
           radius: 16,
         ),
         const SizedBox(width: 10),

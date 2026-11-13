@@ -70,6 +70,106 @@ class _RegionSelectorPageState extends State<RegionSelectorPage> {
       {'name': 'China', 'flag': '🇨🇳'},
       {'name': 'Colombia', 'flag': '🇨🇴'},
     ],
+    'D': [
+      {'name': 'Denmark', 'flag': '🇩🇰'},
+      {'name': 'Djibouti', 'flag': '🇩🇯'},
+      {'name': 'Dominican Republic', 'flag': '🇩🇴'},
+    ],
+    'E': [
+      {'name': 'Egypt', 'flag': '🇪🇬'},
+      {'name': 'Ecuador', 'flag': '🇪🇨'},
+      {'name': 'Ethiopia', 'flag': '🇪🇹'},
+    ],
+    'F': [
+      {'name': 'Finland', 'flag': '🇫🇮'},
+      {'name': 'France', 'flag': '🇫🇷'},
+    ],
+    'G': [
+      {'name': 'Germany', 'flag': '🇩🇪'},
+      {'name': 'Ghana', 'flag': '🇬🇭'},
+      {'name': 'Greece', 'flag': '🇬🇷'},
+    ],
+    'H': [
+      {'name': 'Hong Kong', 'flag': '🇭🇰'},
+      {'name': 'Hungary', 'flag': '🇭🇺'},
+    ],
+    'I': [
+      {'name': 'India', 'flag': '🇮🇳'},
+      {'name': 'Indonesia', 'flag': '🇮🇩'},
+      {'name': 'Iraq', 'flag': '🇮🇶'},
+      {'name': 'Ireland', 'flag': '🇮🇪'},
+      {'name': 'Italy', 'flag': '🇮🇹'},
+    ],
+    'J': [
+      {'name': 'Japan', 'flag': '🇯🇵'},
+      {'name': 'Jordan', 'flag': '🇯🇴'},
+    ],
+    'K': [
+      {'name': 'Kazakhstan', 'flag': '🇰🇿'},
+      {'name': 'Kenya', 'flag': '🇰🇪'},
+      {'name': 'Kuwait', 'flag': '🇰🇼'},
+    ],
+    'L': [
+      {'name': 'Lebanon', 'flag': '🇱🇧'},
+      {'name': 'Libya', 'flag': '🇱🇾'},
+    ],
+    'M': [
+      {'name': 'Malaysia', 'flag': '🇲🇾'},
+      {'name': 'Maldives', 'flag': '🇲🇻'},
+      {'name': 'Mexico', 'flag': '🇲🇽'},
+      {'name': 'Morocco', 'flag': '🇲🇦'},
+    ],
+    'N': [
+      {'name': 'Nepal', 'flag': '🇳🇵'},
+      {'name': 'Netherlands', 'flag': '🇳🇱'},
+      {'name': 'New Zealand', 'flag': '🇳🇿'},
+      {'name': 'Nigeria', 'flag': '🇳🇬'},
+    ],
+    'O': [
+      {'name': 'Oman', 'flag': '🇴🇲'},
+    ],
+    'P': [
+      {'name': 'Pakistan', 'flag': '🇵🇰'},
+      {'name': 'Palestine', 'flag': '🇵🇸'},
+      {'name': 'Philippines', 'flag': '🇵🇭'},
+      {'name': 'Poland', 'flag': '🇵🇱'},
+      {'name': 'Portugal', 'flag': '🇵🇹'},
+    ],
+    'Q': [
+      {'name': 'Qatar', 'flag': '🇶🇦'},
+    ],
+    'R': [
+      {'name': 'Romania', 'flag': '🇷🇴'},
+      {'name': 'Russia', 'flag': '🇷🇺'},
+    ],
+    'S': [
+      {'name': 'Saudi Arabia', 'flag': '🇸🇦'},
+      {'name': 'Singapore', 'flag': '🇸🇬'},
+      {'name': 'South Africa', 'flag': '🇿🇦'},
+      {'name': 'South Korea', 'flag': '🇰🇷'},
+      {'name': 'Spain', 'flag': '🇪🇸'},
+      {'name': 'Sri Lanka', 'flag': '🇱🇰'},
+    ],
+    'T': [
+      {'name': 'Thailand', 'flag': '🇹🇭'},
+      {'name': 'Tunisia', 'flag': '🇹🇳'},
+      {'name': 'Turkey', 'flag': '🇹🇷'},
+    ],
+    'U': [
+      {'name': 'Ukraine', 'flag': '🇺🇦'},
+      {'name': 'United Arab Emirates', 'flag': '🇦🇪'},
+      {'name': 'United Kingdom', 'flag': '🇬🇧'},
+      {'name': 'United States', 'flag': '🇺🇸'},
+    ],
+    'V': [
+      {'name': 'Vietnam', 'flag': '🇻🇳'},
+    ],
+    'Y': [
+      {'name': 'Yemen', 'flag': '🇾🇪'},
+    ],
+    'Z': [
+      {'name': 'Zimbabwe', 'flag': '🇿🇼'},
+    ]
   };
 
   void _chooseRegion(String name) {

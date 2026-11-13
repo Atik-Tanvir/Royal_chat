@@ -1,378 +1,590 @@
-import 'dart:convert';
-import 'dart:math';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/config/auth_session_manager.dart';
-import '../../../../core/config/supabase_config.dart';
+import '../../data/repositories/moments_repository_impl.dart';
 import '../../domain/entities/moment_comment.dart';
 import '../../domain/entities/moment_post.dart';
+import '../../domain/entities/moment_story.dart';
+import '../../domain/entities/social_profile.dart';
+import '../../domain/repositories/moments_repository.dart';
 import 'moments_event.dart';
 import 'moments_state.dart';
 
 class MomentsBloc extends Bloc<MomentsEvent, MomentsState> {
-  static const String _keyLikedPosts = 'royal_liked_moments';
-  static const String _keyCommentsPrefix = 'royal_comments_';
-  RealtimeChannel? _momentsChannel;
+  final MomentsRepository _repository;
 
-  MomentsBloc() : super(const MomentsState()) {
+  MomentsBloc({MomentsRepository? repository})
+      : _repository = repository ?? MomentsRepositoryImpl(),
+        super(const MomentsState()) {
     on<LoadMomentsEvent>(_onLoadMoments);
     on<ChangeMomentTabEvent>(_onChangeTab);
     on<CreateMomentEvent>(_onCreateMoment);
-    on<ToggleLikePostEvent>(_onToggleLike);
+    on<DeleteMomentEvent>(_onDeleteMoment);
+    on<ToggleLikePostEvent>(_onToggleLikePost);
+    on<SharePostEvent>(_onSharePost);
     on<LoadCommentsEvent>(_onLoadComments);
     on<AddCommentEvent>(_onAddComment);
+    on<CreateStoryEvent>(_onCreateStory);
+    on<MarkStoryViewedEvent>(_onMarkStoryViewed);
+    on<ToggleLikeStoryEvent>(_onToggleLikeStory);
+    on<DeleteStoryEvent>(_onDeleteStory);
+    on<ToggleFollowAuthorEvent>(_onToggleFollowAuthor);
+    on<UpdateMySocialProfileEvent>(_onUpdateMySocialProfile);
     on<MomentsUpdatedFromRealtimeEvent>(_onRealtimeUpdate);
-    on<LikedPostsLoadedEvent>((event, emit) {
-      emit(state.copyWith(likedPostIds: event.likedPostIds));
-    });
+    on<LikedPostsLoadedEvent>(_onLikedLoaded);
 
-    _init();
-  }
-
-  Future<void> _init() async {
-    await _loadLikedPosts();
-    _subscribeRealtime();
     add(LoadMomentsEvent());
   }
 
-  void _subscribeRealtime() {
-    try {
-      _momentsChannel = SupabaseConfig.client
-          .channel('public:moments')
-          .onPostgresChanges(
-            event: PostgresChangeEvent.all,
-            schema: 'public',
-            table: 'moments',
-            callback: (payload) {
-              if (payload.newRecord.isNotEmpty) {
-                add(MomentsUpdatedFromRealtimeEvent(payload.newRecord));
-              }
-            },
-          )
-          .subscribe();
-    } catch (e) {
-      debugPrint('[MomentsBloc] Realtime subscription error: $e');
-    }
+  String _currentUserId() => AuthSessionManager.currentUserId ?? 'royal_guest';
+
+  SocialProfileDetails _ensureMyProfile(
+      Map<String, SocialProfileDetails> profiles) {
+    final myId = _currentUserId();
+    final existing = profiles[myId];
+    if (existing != null) return existing;
+
+    final rawName = (AuthSessionManager.currentUserName ?? '').trim();
+    final nickname = rawName.isEmpty ? 'Royal Player' : rawName;
+    final cleanHandle = nickname
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9_]'), '');
+    final initials = nickname.length >= 2
+        ? nickname.substring(0, 2).toUpperCase()
+        : nickname.toUpperCase();
+    final rawAvatar = (AuthSessionManager.currentUserAvatar ?? '').trim();
+    final avatarUrl = rawAvatar.isNotEmpty
+        ? rawAvatar
+        : 'royal_avatar://$initials:1F7A52';
+
+    return SocialProfileDetails(
+      userId: myId,
+      usernameHandle: '@${cleanHandle.isEmpty ? 'royalplayer' : cleanHandle}',
+      nickname: nickname,
+      avatarUrl: avatarUrl,
+      coverGradientIndex: 0,
+      bio: 'Playing games & sharing daily wins on Gamegala!',
+      location: 'Dhaka, Bangladesh',
+      countryFlag: '🇧🇩',
+      level: 15,
+      joinedLabel: 'Member since 2026',
+      followersCount: 142,
+      followingCount: 38,
+    );
   }
 
-  Future<void> _loadLikedPosts() async {
+  Future<void> _onLoadMoments(
+    LoadMomentsEvent event,
+    Emitter<MomentsState> emit,
+  ) async {
+    emit(state.copyWith(isLoading: true));
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final likedList = prefs.getStringList(_keyLikedPosts) ?? [];
-      add(LikedPostsLoadedEvent(likedList.toSet()));
-    } catch (e) {
-      debugPrint('[MomentsBloc] Error loading liked posts: $e');
-    }
-  }
+      final results = await Future.wait([
+        _repository.loadPosts(),
+        _repository.loadStories(),
+        _repository.loadAllComments(),
+        _repository.loadLikedPostIds(),
+        _repository.loadViewedStoryIds(),
+        _repository.loadFollowedAuthorIds(),
+        _repository.loadSocialProfiles(),
+      ]);
 
-  Future<void> _saveLikedPosts(Set<String> liked) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList(_keyLikedPosts, liked.toList());
-    } catch (e) {
-      debugPrint('[MomentsBloc] Error saving liked posts: $e');
-    }
-  }
+      final posts = results[0] as List<MomentPost>;
+      final stories = results[1] as List<MomentStory>;
+      final comments = results[2] as Map<String, List<MomentComment>>;
+      final likedIds = results[3] as Set<String>;
+      final viewedIds = results[4] as Set<String>;
+      final followedIds = results[5] as Set<String>;
+      final profiles = Map<String, SocialProfileDetails>.from(
+        results[6] as Map<String, SocialProfileDetails>,
+      );
 
-  void _onChangeTab(ChangeMomentTabEvent event, Emitter<MomentsState> emit) {
-    emit(state.copyWith(activeTab: event.tab));
-    add(LoadMomentsEvent());
-  }
-
-  Future<void> _onLoadMoments(LoadMomentsEvent event, Emitter<MomentsState> emit) async {
-    if (state.posts.isEmpty) {
-      emit(state.copyWith(isLoading: true));
-    }
-
-    try {
-      // Dynamic queries based on selected tab:
-      // - 'Follow' / 'Hot': sorted by highest likes
-      // - 'Moments': sorted by latest created_at
-      // - 'Video': latest moments with video or media content
-      final dynamic response;
-      if (state.activeTab == 'Follow') {
-        response = await SupabaseConfig.client
-            .from('moments')
-            .select()
-            .order('likes_count', ascending: false);
-      } else {
-        response = await SupabaseConfig.client
-            .from('moments')
-            .select()
-            .order('created_at', ascending: false);
+      final myProfile = _ensureMyProfile(profiles);
+      if (!profiles.containsKey(myProfile.userId)) {
+        profiles[myProfile.userId] = myProfile;
+        await _repository.saveSocialProfiles(profiles);
       }
 
-      final dynamicPosts = (response as List).map((row) {
-        List<String> images = [];
-        final rawImages = row['image_urls'];
-        if (rawImages is List) {
-          images = rawImages.map((e) => e.toString()).toList();
-        }
-
-        final postId = row['id'] as String;
-        final isLiked = state.likedPostIds.contains(postId);
-
-        return MomentPost(
-          id: postId,
-          authorId: row['user_id'] as String? ?? '',
-          authorName: row['user_name'] as String? ?? 'Royal User',
-          authorAvatar: row['user_avatar'] as String? ?? '',
-          countryFlag: '🇧🇩',
-          authorLevel: 1,
-          content: row['content'] as String? ?? '',
-          imageUrls: images,
-          createdAt: DateTime.tryParse(row['created_at']?.toString() ?? '') ?? DateTime.now(),
-          likesCount: (row['likes_count'] as num?)?.toInt() ?? 0,
-          commentsCount: (row['comments_count'] as num?)?.toInt() ?? 0,
-          isLiked: isLiked,
-          category: row['category'] as String? ?? 'Moments',
-          location: row['location'] as String?,
-        );
-      }).toList();
-
-      emit(state.copyWith(posts: dynamicPosts, isLoading: false));
-    } catch (e) {
-      debugPrint('[MomentsBloc] Supabase load error: $e');
+      emit(state.copyWith(
+        posts: posts,
+        stories: stories,
+        commentsByPostId: comments,
+        likedPostIds: likedIds,
+        viewedStoryIds: viewedIds,
+        followedAuthorIds: followedIds,
+        mySocialProfile: myProfile,
+        profilesById: profiles,
+        isLoading: false,
+      ));
+    } catch (_) {
       emit(state.copyWith(isLoading: false));
     }
   }
 
-  Future<void> _onCreateMoment(CreateMomentEvent event, Emitter<MomentsState> emit) async {
-    final currentUserId = AuthSessionManager.currentUserId ?? 'user_${DateTime.now().millisecondsSinceEpoch}';
-    
-    // Fetch live profile details for authentic display
-    String authorName = 'Royal User';
-    String authorAvatar = '';
-    String countryFlag = '🇧🇩';
+  void _onChangeTab(
+    ChangeMomentTabEvent event,
+    Emitter<MomentsState> emit,
+  ) {
+    emit(state.copyWith(activeTab: event.tab));
+  }
 
-    try {
-      final profileRes = await SupabaseConfig.client
-          .from('profiles')
-          .select('nickname, avatar_url, country_flag')
-          .eq('id', currentUserId)
-          .maybeSingle();
-
-      if (profileRes != null) {
-        authorName = profileRes['nickname'] as String? ?? 'Royal User';
-        authorAvatar = profileRes['avatar_url'] as String? ?? '';
-        countryFlag = profileRes['country_flag'] as String? ?? '🇧🇩';
-      }
-    } catch (e) {
-      debugPrint('[MomentsBloc] Fetch author profile error: $e');
-    }
-
-    final postId = 'moment_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(9999)}';
+  Future<void> _onCreateMoment(
+    CreateMomentEvent event,
+    Emitter<MomentsState> emit,
+  ) async {
+    final myProfile =
+        state.mySocialProfile ?? _ensureMyProfile(state.profilesById);
+    final now = DateTime.now();
     final newPost = MomentPost(
-      id: postId,
-      authorId: currentUserId,
-      authorName: authorName,
-      authorAvatar: authorAvatar,
-      countryFlag: countryFlag,
-      authorLevel: 1,
-      content: event.content,
-      imageUrls: event.imageUrls,
-      createdAt: DateTime.now(),
+      id: 'post_${now.millisecondsSinceEpoch}',
+      authorId: myProfile.userId,
+      authorName: myProfile.nickname,
+      authorAvatar: myProfile.avatarUrl,
+      countryFlag: myProfile.countryFlag,
+      authorLevel: myProfile.level,
+      content: event.content.trim(),
+      imageUrls: List<String>.from(event.imageUrls),
+      createdAt: now,
       likesCount: 0,
       commentsCount: 0,
+      sharesCount: 0,
+      isLiked: false,
       category: event.category,
       location: event.location,
     );
 
-    // Optimistically add to state
-    emit(state.copyWith(posts: [newPost, ...state.posts]));
+    final updatedPosts = [newPost, ...state.posts];
+    List<MomentStory> updatedStories = state.stories;
 
-    // Persist to Supabase moments table
-    try {
-      await SupabaseConfig.client.from('moments').insert({
-        'id': postId,
-        'user_id': currentUserId,
-        'user_name': authorName,
-        'user_avatar': authorAvatar,
-        'content': event.content,
-        'image_urls': event.imageUrls,
-        'likes_count': 0,
-        'comments_count': 0,
-        'category': event.category,
-        'location': event.location,
-      });
-      debugPrint('[MomentsBloc] Moment inserted to Supabase: $postId');
-    } catch (e) {
-      debugPrint('[MomentsBloc] Moment insert error: $e');
+    if (event.shareToStory) {
+      final newStory = MomentStory(
+        id: 'story_${now.millisecondsSinceEpoch}',
+        authorId: myProfile.userId,
+        authorName: myProfile.nickname,
+        authorAvatar: myProfile.avatarUrl,
+        countryFlag: myProfile.countryFlag,
+        mediaUrl: event.imageUrls.isNotEmpty ? event.imageUrls.first : null,
+        caption: event.content.trim(),
+        bgGradientIndex: 0,
+        createdAt: now,
+        expiresAt: now.add(const Duration(hours: 24)),
+      );
+      updatedStories = [newStory, ...state.stories];
+      await _repository.saveStories(updatedStories);
     }
+
+    emit(state.copyWith(
+      posts: updatedPosts,
+      stories: updatedStories,
+      uiToastMessage: event.shareToStory
+          ? 'Moment & Story published!'
+          : 'Moment published!',
+      uiToastTick: state.uiToastTick + 1,
+    ));
+
+    await _repository.savePosts(updatedPosts);
+    await _repository.publishPostToRemote(newPost);
   }
 
-  Future<void> _onToggleLike(ToggleLikePostEvent event, Emitter<MomentsState> emit) async {
-    final currentlyLiked = state.likedPostIds.contains(event.postId);
-    final updatedLiked = Set<String>.from(state.likedPostIds);
+  Future<void> _onDeleteMoment(
+    DeleteMomentEvent event,
+    Emitter<MomentsState> emit,
+  ) async {
+    final updated = state.posts.where((p) => p.id != event.postId).toList();
+    emit(state.copyWith(
+      posts: updated,
+      uiToastMessage: 'Post deleted from your timeline',
+      uiToastTick: state.uiToastTick + 1,
+    ));
+    await _repository.savePosts(updated);
+  }
 
-    if (currentlyLiked) {
-      updatedLiked.remove(event.postId);
+  Future<void> _onToggleLikePost(
+    ToggleLikePostEvent event,
+    Emitter<MomentsState> emit,
+  ) async {
+    final idx = state.posts.indexWhere((p) => p.id == event.postId);
+    if (idx == -1) return;
+
+    final current = state.posts[idx];
+    final nextLiked = !current.isLiked;
+    final nextCount =
+        nextLiked ? current.likesCount + 1 : (current.likesCount - 1).clamp(0, 999999);
+
+    final updatedLikedIds = Set<String>.from(state.likedPostIds);
+    if (nextLiked) {
+      updatedLikedIds.add(event.postId);
     } else {
-      updatedLiked.add(event.postId);
+      updatedLikedIds.remove(event.postId);
     }
 
-    int targetCount = 0;
-    final updatedPosts = state.posts.map((post) {
-      if (post.id == event.postId) {
-        final newLiked = !currentlyLiked;
-        final newCount = newLiked ? post.likesCount + 1 : (post.likesCount > 0 ? post.likesCount - 1 : 0);
-        targetCount = newCount;
-        return post.copyWith(isLiked: newLiked, likesCount: newCount);
-      }
-      return post;
-    }).toList();
+    final updatedPosts = List<MomentPost>.from(state.posts);
+    updatedPosts[idx] = current.copyWith(
+      isLiked: nextLiked,
+      likesCount: nextCount,
+    );
 
-    emit(state.copyWith(posts: updatedPosts, likedPostIds: updatedLiked));
-    _saveLikedPosts(updatedLiked);
+    emit(state.copyWith(
+      posts: updatedPosts,
+      likedPostIds: updatedLikedIds,
+    ));
 
-    try {
-      await SupabaseConfig.client
-          .from('moments')
-          .update({'likes_count': targetCount})
-          .eq('id', event.postId);
-    } catch (e) {
-      debugPrint('[MomentsBloc] Supabase update likes error: $e');
-    }
+    await _repository.saveLikedPostIds(updatedLikedIds);
+    await _repository.savePosts(updatedPosts);
+    await _repository.toggleLikeRemote(event.postId, nextCount);
   }
 
-  Future<void> _onLoadComments(LoadCommentsEvent event, Emitter<MomentsState> emit) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final rawList = prefs.getStringList('$_keyCommentsPrefix${event.postId}') ?? [];
-      final comments = rawList.map((str) {
-        final Map<String, dynamic> json = jsonDecode(str);
-        return MomentComment.fromJson(json);
-      }).toList();
+  Future<void> _onSharePost(
+    SharePostEvent event,
+    Emitter<MomentsState> emit,
+  ) async {
+    final idx = state.posts.indexWhere((p) => p.id == event.postId);
+    if (idx == -1) return;
 
-      final updatedMap = Map<String, List<MomentComment>>.from(state.commentsByPostId);
-      updatedMap[event.postId] = comments;
-      emit(state.copyWith(commentsByPostId: updatedMap));
-    } catch (e) {
-      debugPrint('[MomentsBloc] Error loading comments: $e');
+    final targetPost = state.posts[idx];
+    final myProfile =
+        state.mySocialProfile ?? _ensureMyProfile(state.profilesById);
+    final now = DateTime.now();
+
+    final updatedPosts = List<MomentPost>.from(state.posts);
+    updatedPosts[idx] = targetPost.copyWith(
+      sharesCount: targetPost.sharesCount + 1,
+    );
+
+    List<MomentStory> updatedStories = state.stories;
+    String toast;
+
+    switch (event.target) {
+      case SharePostTarget.repostFeed:
+        final noteText = event.note?.trim() ?? '';
+        final repostText = noteText.isNotEmpty
+            ? '$noteText\n\n"${targetPost.content}"'
+            : targetPost.content;
+        final repost = MomentPost(
+          id: 'repost_${now.millisecondsSinceEpoch}',
+          authorId: myProfile.userId,
+          authorName: myProfile.nickname,
+          authorAvatar: myProfile.avatarUrl,
+          countryFlag: myProfile.countryFlag,
+          authorLevel: myProfile.level,
+          content: repostText,
+          imageUrls: List<String>.from(targetPost.imageUrls),
+          createdAt: now,
+          likesCount: 0,
+          commentsCount: 0,
+          sharesCount: 0,
+          category: 'Moments',
+          location: myProfile.location,
+          isRepost: true,
+          repostedFromAuthor: targetPost.authorName,
+          repostedFromPostId: targetPost.id,
+        );
+        updatedPosts.insert(0, repost);
+        toast = 'Shared ${targetPost.authorName}\'s post to your feed!';
+        break;
+      case SharePostTarget.shareToStory:
+        final sharedStory = MomentStory(
+          id: 'story_${now.millisecondsSinceEpoch}',
+          authorId: myProfile.userId,
+          authorName: myProfile.nickname,
+          authorAvatar: myProfile.avatarUrl,
+          countryFlag: myProfile.countryFlag,
+          mediaUrl: targetPost.imageUrls.isNotEmpty
+              ? targetPost.imageUrls.first
+              : null,
+          caption: 'Shared from ${targetPost.authorName}: ${targetPost.content}',
+          bgGradientIndex: 3,
+          createdAt: now,
+          expiresAt: now.add(const Duration(hours: 24)),
+        );
+        updatedStories = [sharedStory, ...state.stories];
+        await _repository.saveStories(updatedStories);
+        toast = 'Shared post to your Story!';
+        break;
+      case SharePostTarget.copyLink:
+        toast = 'Post link & summary copied!';
+        break;
     }
+
+    emit(state.copyWith(
+      posts: updatedPosts,
+      stories: updatedStories,
+      uiToastMessage: toast,
+      uiToastTick: state.uiToastTick + 1,
+    ));
+
+    await _repository.savePosts(updatedPosts);
   }
 
-  Future<void> _onAddComment(AddCommentEvent event, Emitter<MomentsState> emit) async {
-    final currentUserId = AuthSessionManager.currentUserId ?? 'user_${DateTime.now().millisecondsSinceEpoch}';
+  Future<void> _onLoadComments(
+    LoadCommentsEvent event,
+    Emitter<MomentsState> emit,
+  ) async {
+    final all = await _repository.loadAllComments();
+    emit(state.copyWith(
+      commentsByPostId: {
+        ...state.commentsByPostId,
+        ...all,
+      },
+    ));
+  }
 
-    String authorName = 'Royal User';
-    String authorAvatar = '';
+  Future<void> _onAddComment(
+    AddCommentEvent event,
+    Emitter<MomentsState> emit,
+  ) async {
+    final cleanText = event.text.trim();
+    if (cleanText.isEmpty) return;
 
-    try {
-      final profileRes = await SupabaseConfig.client
-          .from('profiles')
-          .select('nickname, avatar_url')
-          .eq('id', currentUserId)
-          .maybeSingle();
-
-      if (profileRes != null) {
-        authorName = profileRes['nickname'] as String? ?? 'Royal User';
-        authorAvatar = profileRes['avatar_url'] as String? ?? '';
-      }
-    } catch (e) {
-      debugPrint('[MomentsBloc] Comment author profile fetch error: $e');
-    }
-
+    final myProfile =
+        state.mySocialProfile ?? _ensureMyProfile(state.profilesById);
     final newComment = MomentComment(
-      id: 'cmt_${DateTime.now().millisecondsSinceEpoch}',
+      id: 'comment_${DateTime.now().millisecondsSinceEpoch}',
       postId: event.postId,
-      userId: currentUserId,
-      userName: authorName,
-      userAvatar: authorAvatar,
-      text: event.text,
+      userId: myProfile.userId,
+      userName: myProfile.nickname,
+      userAvatar: myProfile.avatarUrl,
+      text: cleanText,
       createdAt: DateTime.now(),
     );
 
-    // Update in-memory comments
-    final updatedMap = Map<String, List<MomentComment>>.from(state.commentsByPostId);
-    final currentComments = List<MomentComment>.from(updatedMap[event.postId] ?? []);
-    currentComments.add(newComment);
-    updatedMap[event.postId] = currentComments;
+    final existing =
+        List<MomentComment>.from(state.commentsByPostId[event.postId] ?? []);
+    existing.add(newComment);
 
-    // Increment post's comment count in state
-    int newCount = 1;
+    final updatedCommentsMap =
+        Map<String, List<MomentComment>>.from(state.commentsByPostId)
+          ..[event.postId] = existing;
+
     final updatedPosts = state.posts.map((p) {
       if (p.id == event.postId) {
-        newCount = p.commentsCount + 1;
-        return p.copyWith(commentsCount: newCount);
+        return p.copyWith(commentsCount: existing.length);
       }
       return p;
     }).toList();
 
-    emit(state.copyWith(commentsByPostId: updatedMap, posts: updatedPosts));
+    emit(state.copyWith(
+      commentsByPostId: updatedCommentsMap,
+      posts: updatedPosts,
+    ));
 
-    // Save comments to persistent local cache
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final strList = currentComments.map((c) => jsonEncode(c.toJson())).toList();
-      await prefs.setStringList('$_keyCommentsPrefix${event.postId}', strList);
-    } catch (e) {
-      debugPrint('[MomentsBloc] Save comments cache error: $e');
-    }
-
-    // Update Supabase comments count
-    try {
-      await SupabaseConfig.client
-          .from('moments')
-          .update({'comments_count': newCount})
-          .eq('id', event.postId);
-    } catch (e) {
-      debugPrint('[MomentsBloc] Update Supabase comments count error: $e');
-    }
+    await _repository.saveCommentsForPost(event.postId, existing);
+    await _repository.savePosts(updatedPosts);
   }
 
-  void _onRealtimeUpdate(MomentsUpdatedFromRealtimeEvent event, Emitter<MomentsState> emit) {
-    try {
-      final record = event.payload;
-      final updatedId = record['id'] as String?;
-      if (updatedId == null) return;
+  Future<void> _onCreateStory(
+    CreateStoryEvent event,
+    Emitter<MomentsState> emit,
+  ) async {
+    final myProfile =
+        state.mySocialProfile ?? _ensureMyProfile(state.profilesById);
+    final now = DateTime.now();
+    final story = MomentStory(
+      id: 'story_${now.millisecondsSinceEpoch}',
+      authorId: myProfile.userId,
+      authorName: myProfile.nickname,
+      authorAvatar: myProfile.avatarUrl,
+      countryFlag: myProfile.countryFlag,
+      mediaUrl: event.mediaUrl,
+      caption: event.caption.trim(),
+      bgGradientIndex: event.bgGradientIndex,
+      createdAt: now,
+      expiresAt: now.add(const Duration(hours: 24)),
+      viewsCount: 1,
+    );
 
-      final existingIndex = state.posts.indexWhere((p) => p.id == updatedId);
-      if (existingIndex != -1) {
-        final existing = state.posts[existingIndex];
-        final updatedPost = existing.copyWith(
-          likesCount: (record['likes_count'] as num?)?.toInt() ?? existing.likesCount,
-          commentsCount: (record['comments_count'] as num?)?.toInt() ?? existing.commentsCount,
-        );
-        final newPosts = List<MomentPost>.from(state.posts);
-        newPosts[existingIndex] = updatedPost;
-        emit(state.copyWith(posts: newPosts));
-      } else {
-        // New post arrived via Realtime
-        List<String> images = [];
-        final rawImages = record['image_urls'];
-        if (rawImages is List) {
-          images = rawImages.map((e) => e.toString()).toList();
-        }
+    final updatedStories = [story, ...state.stories];
+    emit(state.copyWith(
+      stories: updatedStories,
+      uiToastMessage: 'Your Story is now live for 24 hours!',
+      uiToastTick: state.uiToastTick + 1,
+    ));
+    await _repository.saveStories(updatedStories);
+  }
 
-        final newPost = MomentPost(
-          id: updatedId,
-          authorId: record['user_id'] as String? ?? '',
-          authorName: record['user_name'] as String? ?? 'Royal User',
-          authorAvatar: record['user_avatar'] as String? ?? '',
-          countryFlag: '🇧🇩',
-          authorLevel: 1,
-          content: record['content'] as String? ?? '',
-          imageUrls: images,
-          createdAt: DateTime.tryParse(record['created_at']?.toString() ?? '') ?? DateTime.now(),
-          likesCount: (record['likes_count'] as num?)?.toInt() ?? 0,
-          commentsCount: (record['comments_count'] as num?)?.toInt() ?? 0,
-          isLiked: state.likedPostIds.contains(updatedId),
-          category: record['category'] as String? ?? 'Moments',
-          location: record['location'] as String?,
-        );
-        emit(state.copyWith(posts: [newPost, ...state.posts]));
+  Future<void> _onMarkStoryViewed(
+    MarkStoryViewedEvent event,
+    Emitter<MomentsState> emit,
+  ) async {
+    final updatedViewed = Set<String>.from(state.viewedStoryIds);
+    final firstView = updatedViewed.add(event.storyId);
+    final updatedStories = state.stories.map((s) {
+      if (s.id == event.storyId && firstView) {
+        return s.copyWith(viewsCount: s.viewsCount + 1);
       }
-    } catch (e) {
-      debugPrint('[MomentsBloc] Realtime process error: $e');
-    }
+      return s;
+    }).toList();
+
+    emit(state.copyWith(
+      viewedStoryIds: updatedViewed,
+      stories: updatedStories,
+    ));
+
+    await _repository.saveViewedStoryIds(updatedViewed);
+    await _repository.saveStories(updatedStories);
   }
 
-  @override
-  Future<void> close() {
-    _momentsChannel?.unsubscribe();
-    return super.close();
+  Future<void> _onToggleLikeStory(
+    ToggleLikeStoryEvent event,
+    Emitter<MomentsState> emit,
+  ) async {
+    final updatedStories = state.stories.map((s) {
+      if (s.id == event.storyId) {
+        final nextLiked = !s.isLikedByMe;
+        return s.copyWith(
+          isLikedByMe: nextLiked,
+          likesCount: nextLiked ? s.likesCount + 1 : (s.likesCount - 1).clamp(0, 999999),
+        );
+      }
+      return s;
+    }).toList();
+
+    emit(state.copyWith(stories: updatedStories));
+    await _repository.saveStories(updatedStories);
+  }
+
+  Future<void> _onDeleteStory(
+    DeleteStoryEvent event,
+    Emitter<MomentsState> emit,
+  ) async {
+    final updatedStories =
+        state.stories.where((s) => s.id != event.storyId).toList();
+    emit(state.copyWith(
+      stories: updatedStories,
+      uiToastMessage: 'Story removed',
+      uiToastTick: state.uiToastTick + 1,
+    ));
+    await _repository.saveStories(updatedStories);
+  }
+
+  Future<void> _onToggleFollowAuthor(
+    ToggleFollowAuthorEvent event,
+    Emitter<MomentsState> emit,
+  ) async {
+    final updatedFollowed = Set<String>.from(state.followedAuthorIds);
+    final nowFollowing = updatedFollowed.add(event.authorId);
+    if (!nowFollowing) {
+      updatedFollowed.remove(event.authorId);
+    }
+
+    final updatedProfiles =
+        Map<String, SocialProfileDetails>.from(state.profilesById);
+    final targetProfile = updatedProfiles[event.authorId];
+    if (targetProfile != null) {
+      updatedProfiles[event.authorId] = targetProfile.copyWith(
+        followersCount: nowFollowing
+            ? targetProfile.followersCount + 1
+            : (targetProfile.followersCount - 1).clamp(0, 9999999),
+      );
+    }
+
+    final myProfile = state.mySocialProfile;
+    SocialProfileDetails? updatedMine = myProfile;
+    if (myProfile != null) {
+      updatedMine = myProfile.copyWith(
+        followingCount: nowFollowing
+            ? myProfile.followingCount + 1
+            : (myProfile.followingCount - 1).clamp(0, 9999999),
+      );
+      updatedProfiles[myProfile.userId] = updatedMine;
+    }
+
+    emit(state.copyWith(
+      followedAuthorIds: updatedFollowed,
+      profilesById: updatedProfiles,
+      mySocialProfile: updatedMine,
+      uiToastMessage: nowFollowing
+          ? 'Following ${event.authorName}'
+          : 'Unfollowed ${event.authorName}',
+      uiToastTick: state.uiToastTick + 1,
+    ));
+
+    await _repository.saveFollowedAuthorIds(updatedFollowed);
+    await _repository.saveSocialProfiles(updatedProfiles);
+  }
+
+  Future<void> _onUpdateMySocialProfile(
+    UpdateMySocialProfileEvent event,
+    Emitter<MomentsState> emit,
+  ) async {
+    final base = state.mySocialProfile ?? _ensureMyProfile(state.profilesById);
+    final cleanHandle = event.usernameHandle.trim().startsWith('@')
+        ? event.usernameHandle.trim()
+        : '@${event.usernameHandle.trim()}';
+
+    final updatedProfile = base.copyWith(
+      nickname: event.nickname.trim().isEmpty
+          ? base.nickname
+          : event.nickname.trim(),
+      usernameHandle: cleanHandle == '@' ? base.usernameHandle : cleanHandle,
+      bio: event.bio.trim(),
+      location: event.location.trim().isEmpty
+          ? base.location
+          : event.location.trim(),
+      avatarUrl: event.avatarUrl.trim().isEmpty
+          ? base.avatarUrl
+          : event.avatarUrl.trim(),
+      coverGradientIndex: event.coverGradientIndex,
+      coverImageUrl: event.coverImageUrl,
+    );
+
+    final updatedProfiles =
+        Map<String, SocialProfileDetails>.from(state.profilesById)
+          ..[updatedProfile.userId] = updatedProfile;
+
+    // Keep all posts and stories authored by current user synced with updated name/avatar.
+    final updatedPosts = state.posts.map((p) {
+      if (p.authorId == updatedProfile.userId) {
+        return p.copyWith(
+          authorName: updatedProfile.nickname,
+          authorAvatar: updatedProfile.avatarUrl,
+        );
+      }
+      return p;
+    }).toList();
+
+    final updatedStories = state.stories.map((s) {
+      if (s.authorId == updatedProfile.userId) {
+        return s.copyWith(
+          authorName: updatedProfile.nickname,
+          authorAvatar: updatedProfile.avatarUrl,
+        );
+      }
+      return s;
+    }).toList();
+
+    emit(state.copyWith(
+      mySocialProfile: updatedProfile,
+      profilesById: updatedProfiles,
+      posts: updatedPosts,
+      stories: updatedStories,
+      uiToastMessage: 'Social profile updated!',
+      uiToastTick: state.uiToastTick + 1,
+    ));
+
+    // Also keep AuthSessionManager in sync across the app.
+    await AuthSessionManager.saveSession(
+      userId: updatedProfile.userId,
+      name: updatedProfile.nickname,
+      email: AuthSessionManager.currentUserEmail ?? 'player@gamegala.app',
+      avatarUrl: updatedProfile.avatarUrl,
+    );
+
+    await _repository.saveSocialProfiles(updatedProfiles);
+    await _repository.savePosts(updatedPosts);
+    await _repository.saveStories(updatedStories);
+  }
+
+  void _onRealtimeUpdate(
+    MomentsUpdatedFromRealtimeEvent event,
+    Emitter<MomentsState> emit,
+  ) {
+    add(LoadMomentsEvent());
+  }
+
+  void _onLikedLoaded(
+    LikedPostsLoadedEvent event,
+    Emitter<MomentsState> emit,
+  ) {
+    emit(state.copyWith(likedPostIds: event.likedPostIds));
   }
 }

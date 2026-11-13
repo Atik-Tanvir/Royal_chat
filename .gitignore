@@ -50,3 +50,11 @@ app.*.map.json
 # Android local configuration
 **/android/local.properties
 **/android/.gradle/
+
+# Build artifacts & local scratch
+*.apk
+app-release.apk
+releases/
+gemgala_extracted/
+scratch/
+

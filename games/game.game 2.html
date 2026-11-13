@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RoyaleChat Live - Custom Color Slot</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            user-select: none;
+        }
+        body {
+            background-color: #080313;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .app-container {
+            width: 380px;
+            height: 760px;
+            background: linear-gradient(180deg, #1b0a33 0%, #090314 100%);
+            border: 2px solid #ffcc00;
+            border-radius: 24px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 25px rgba(255, 204, 0, 0.25);
+            overflow: hidden;
+            position: relative;
+        }
+        
+        /* Top Header */
+        .header {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 204, 0, 0.3);
+        }
+        .title { font-weight: bold; color: #ffcc00; font-size: 13px; }
+        .timer-box {
+            background: #ff4757;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 14px;
+            box-shadow: 0 0 8px rgba(255, 71, 87, 0.6);
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            display: flex;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px 12px;
+            font-size: 11px;
+            color: #aaa;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .stats-bar span { color: #ffcc00; font-weight: bold; }
+
+        .game-area {
+            flex: 1;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Sliding Bowl Container */
+        .slot-container {
+            width: 130px;
+            height: 130px;
+            position: relative;
+            margin: 10px 0;
+            perspective: 600px;
+        }
+        .bowl {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: radial-gradient(circle, #ffffff 30%, #b3b3b3 100%);
+            border: 6px solid #e6e6e6;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.3s;
+        }
+        .bowl-inner {
+            width: 95px;
+            height: 95px;
+            border-radius: 50%;
+            background: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 32px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+        }
+        
+        .slide-out {
+            transform: translateY(-120px) rotate(-25deg);
+            opacity: 0.8;
+        }
+
+        .status-text {
+            font-size: 13px;
+            color: #ffcc00;
+            font-weight: bold;
+            text-align: center;
+            min-height: 24px;
+        }
+
+        /* 3 Color Zones */
+        .color-zones {
+            width: 100%;
+            display: flex;
+            gap: 8px;
+        }
+        .color-card {
+            flex: 1;
+            height: 110px;
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: 0.2s;
+            position: relative;
+        }
+        .color-card.selected {
+            border-color: #ffffff !important;
+            box-shadow: 0 0 12px #ffffff;
+            transform: scale(1.03);
+        }
+
+        .card-red { background: linear-gradient(135deg, #ff416c, #ff4b2b); }
+        .card-violet { background: linear-gradient(135deg, #8a2be2, #4a00e0); }
+        .card-green { background: linear-gradient(135deg, #11998e, #38ef7d); }
+
+        .card-title { font-size: 15px; font-weight: bold; }
+        .card-payout { font-size: 10px; opacity: 0.85; margin-top: 2px; }
+        .user-bet { font-size: 11px; margin-top: 4px; background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 8px; }
+
+        /* Custom Coin Controls & Manual Input */
+        .coin-controls {
+            width: 100%;
+            background: rgba(0,0,0,0.4);
+            padding: 10px;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .input-group {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+        .btn-qty {
+            width: 42px;
+            height: 42px;
+            background: #251642;
+            border: 2px solid #ffcc00;
+            color: #ffcc00;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 22px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        .btn-qty:active {
+            transform: scale(0.92);
+        }
+        .coin-input {
+            width: 130px;
+            height: 42px;
+            background: #110826;
+            border: 2px solid #ffcc00;
+            border-radius: 10px;
+            color: #ffcc00;
+            text-align: center;
+            font-weight: bold;
+            font-size: 18px;
+            outline: none;
+            user-select: text !important;
+        }
+        
+        .chips-presets {
+            display: flex;
+            justify-content: space-around;
+        }
+        .chip-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,204,0,0.3);
+            color: #fff;
+            padding: 6px 14px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .footer {
+            padding: 12px;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+            border-top: 1px solid rgba(255,204,0,0.2);
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- Header -->
+    <div class="header">
+        <span class="title">👑 RoyaleChat (35s Color Slot)</span>
+        <div class="timer-box" id="timer">00:35</div>
+    </div>
+
+    <!-- Live Board Stats -->
+    <div class="stats-bar">
+        <div>কাস্টমার ব্যালেন্স: <span id="balanceHeader">50,000</span> 🪙</div>
+        <div>বোর্ডে মোট বাজি: <span id="totalPool">1,31,251</span> 🪙</div>
+    </div>
+
+    <div class="game-area">
+        <!-- Slot Bowl -->
+        <div class="slot-container">
+            <div class="bowl" id="bowl">
+                <div class="bowl-inner" id="bowlInner">❓</div>
+            </div>
+        </div>
+
+        <div class="status-text" id="statusText">পছন্দের কালার ও কয়েন সিলেক্ট করুন!</div>
+
+        <!-- 3 Color Zones -->
+        <div class="color-zones">
+            <div class="color-card card-red" id="card-red" onclick="placeBet('red')">
+                <span class="card-title">RED</span>
+                <span class="card-payout">Win 1:2</span>
+                <span class="user-bet" id="bet-red">🪙 0</span>
+            </div>
+
+            <div class="color-card card-violet" id="card-violet" onclick="placeBet('violet')">
+                <span class="card-title">VIOLET</span>
+                <span class="card-payout">Win 1:4.5</span>
+                <span class="user-bet" id="bet-violet">🪙 0</span>
+            </div>
+
+            <div class="color-card card-green" id="card-green" onclick="placeBet('green')">
+                <span class="card-title">GREEN</span>
+                <span class="card-payout">Win 1:2</span>
+                <span class="user-bet" id="bet-green">🪙 0</span>
+            </div>
+        </div>
+
+        <!-- Custom Coin Selection (+ / - & Manual Type Input) -->
+        <div class="coin-controls">
+            <div class="input-group">
+                <button class="btn-qty" onclick="stepCoin('down')">-</button>
+                <input type="number" id="customCoin" class="coin-input" value="100" min="10" step="10">
+                <button class="btn-qty" onclick="stepCoin('up')">+</button>
+            </div>
+            
+            <div class="chips-presets">
+                <div class="chip-btn" onclick="setCoin(100)">100</div>
+                <div class="chip-btn" onclick="setCoin(500)">500</div>
+                <div class="chip-btn" onclick="setCoin(1000)">1K</div>
+                <div class="chip-btn" onclick="setCoin(5000)">5K</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <div>কয়েন ব্যালেন্স: <span style="color:#ffcc00; font-weight:bold;" id="balance">50,000</span> 🪙</div>
+    </div>
+</div>
+
+<script>
+    let balance = 50000;
+    let timeLeft = 35;
+    let timerInterval = null;
+    let userBets = { red: 0, violet: 0, green: 0 };
+    let isBettingOpen = true;
+    let totalPoolCount = 131251;
+
+    const timerEl = document.getElementById('timer');
+    const customCoinInput = document.getElementById('customCoin');
+    const statusText = document.getElementById('statusText');
+    const bowl = document.getElementById('bowl');
+    const bowlInner = document.getElementById('bowlInner');
+
+    // Dynamic Step Increment Logic (100 -> 150 -> 200 ... 1000 -> 1500 -> 2000 ...)
+    function stepCoin(direction) {
+        let current = parseInt(customCoinInput.value) || 100;
+        let step = 50;
+
+        if (current >= 10000) {
+            step = 1000;
+        } else if (current >= 1000) {
+            step = 500;
+        } else {
+            step = 50;
+        }
+
+        if (direction === 'up') {
+            current += step;
+        } else if (direction === 'down') {
+            if (current - step >= 10) {
+                current -= step;
+            } else {
+                current = 10;
+            }
+        }
+        customCoinInput.value = current;
+    }
+
+    function setCoin(amount) {
+        customCoinInput.value = amount;
+    }
+
+    // 35 Seconds Game Timer Loop
+    function startTimer() {
+        clearInterval(timerInterval);
+        timeLeft = 35;
+        isBettingOpen = true;
+        
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            let sec = timeLeft < 10 ? '0' + timeLeft : timeLeft;
+            timerEl.innerText = `00:${sec}`;
+
+            if(isBettingOpen && timeLeft % 3 === 0) {
+                totalPoolCount += Math.floor(Math.random() * 800) + 200;
+                document.getElementById('totalPool').innerText = totalPoolCount.toLocaleString();
+            }
+
+            if (timeLeft === 5) {
+                isBettingOpen = false;
+                statusText.innerText = "⏳ বেটিং বন্ধ! বাটি ঘোড়ানো হচ্ছে...";
+            }
+
+            if (timeLeft === 0) {
+                clearInterval(timerInterval);
+                revealSlotResult();
+            }
+        }, 1000);
+    }
+
+    function placeBet(color) {
+        if (!isBettingOpen) {
+            alert("এই রাউন্ডের সময় শেষ! পরের রাউন্ডের জন্য অপেক্ষা করুন।");
+            return;
+        }
+
+        let betAmount = parseInt(customCoinInput.value);
+        if (isNaN(betAmount) || betAmount <= 0) {
+            alert("দয়া করে সঠিক কয়েন পরিমাণ লিখুন!");
+            return;
+        }
+
+        if (balance < betAmount) {
+            alert("আপনার পর্যাপ্ত কয়েন ব্যালেন্স নেই!");
+            return;
+        }
+
+        balance -= betAmount;
+        userBets[color] += betAmount;
+        totalPoolCount += betAmount;
+
+        document.getElementById('balance').innerText = balance.toLocaleString();
+        document.getElementById('balanceHeader').innerText = balance.toLocaleString();
+        document.getElementById(`bet-${color}`).innerText = `🪙 ${userBets[color].toLocaleString()}`;
+        document.getElementById(`card-${color}`).classList.add('selected');
+        document.getElementById('totalPool').innerText = totalPoolCount.toLocaleString();
+        
+        statusText.innerText = `${color.toUpperCase()}-এ ${betAmount} কয়েন ধরা হয়েছে!`;
+    }
+
+    function revealSlotResult() {
+        statusText.innerText = "🎰 বাটি ঘুরছে...";
+        bowl.classList.add('slide-out');
+
+        setTimeout(() => {
+            let colors = ['red', 'green', 'violet', 'red', 'green'];
+            let winningColor = colors[Math.floor(Math.random() * colors.length)];
+
+            bowlInner.innerText = '';
+            if(winningColor === 'red') bowlInner.style.background = '#ff416c';
+            if(winningColor === 'green') bowlInner.style.background = '#38ef7d';
+            if(winningColor === 'violet') bowlInner.style.background = '#8a2be2';
+
+            bowl.classList.remove('slide-out');
+
+            let winCoins = 0;
+            if (winningColor === 'red' && userBets.red > 0) winCoins += userBets.red * 2;
+            if (winningColor === 'green' && userBets.green > 0) winCoins += userBets.green * 2;
+            if (winningColor === 'violet' && userBets.violet > 0) winCoins += userBets.violet * 4.5;
+
+            if (winCoins > 0) {
+                balance += winCoins;
+                statusText.innerText = `🎉 বিজয়ী কালার ${winningColor.toUpperCase()}! আপনি ${winCoins} কয়েন পেয়েছেন!`;
+            } else {
+                statusText.innerText = `❌ বিজয়ী কালার ${winningColor.toUpperCase()}! আবার চেষ্টা করুন।`;
+            }
+
+            document.getElementById('balance').innerText = balance.toLocaleString();
+            document.getElementById('balanceHeader').innerText = balance.toLocaleString();
+
+            setTimeout(() => {
+                resetRound();
+                startTimer();
+            }, 4000);
+
+        }, 1000);
+    }
+
+    function resetRound() {
+        userBets = { red: 0, violet: 0, green: 0 };
+        document.getElementById('bet-red').innerText = '🪙 0';
+        document.getElementById('bet-violet').innerText = '🪙 0';
+        document.getElementById('bet-green').innerText = '🪙 0';
+        document.querySelectorAll('.color-card').forEach(c => c.classList.remove('selected'));
+        bowlInner.style.background = '#222';
+        bowlInner.innerText = '❓';
+        statusText.innerText = "নতুন রাউন্ড শুরু হয়েছে! আপনার পছন্দের কালারে কয়েন ধরুন।";
+    }
+
+    startTimer();
+</script>
+
+</body>
+</html>
