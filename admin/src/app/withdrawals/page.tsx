@@ -102,7 +102,15 @@ export default function WithdrawalsPage() {
     );
 
     try {
-      await supabase.from('withdrawals').update({ status: newStatus }).eq('id', activeTx.id);
+      await supabase
+        .from('withdrawals')
+        .update({
+          status: newStatus,
+          transaction_id: actionType === 'approve' ? proofNote : null,
+          admin_note: proofNote,
+          processed_at: new Date().toISOString(),
+        })
+        .eq('id', activeTx.id);
     } catch (e) {
       console.error(e);
     }
@@ -265,13 +273,23 @@ export default function WithdrawalsPage() {
                     </div>
                   </div>
                 </td>
-                <td className="py-3 px-4 font-semibold text-slate-200">{w.gateway}</td>
+                <td className="py-3 px-4 font-semibold text-slate-200">
+                  <span>{w.gateway}</span>
+                  {w.account_number ? (
+                    <span className="block text-[11px] text-amber-400 font-mono">{w.account_number}</span>
+                  ) : null}
+                </td>
                 <td className="py-3 px-4 font-bold text-cyan-400">{formatGems(w.gems)}</td>
                 <td className="py-3 px-4 font-black text-emerald-400 text-sm">{formatUSD(w.amount)}</td>
                 <td className="py-3 px-4">
                   <Badge variant={w.status === 'Approved' ? 'emerald' : w.status === 'Rejected' ? 'rose' : 'amber'}>
                     {w.status}
                   </Badge>
+                  {w.transaction_id ? (
+                    <span className="block text-[10px] text-slate-400 font-mono mt-0.5">Trx: {w.transaction_id}</span>
+                  ) : w.admin_note ? (
+                    <span className="block text-[10px] text-rose-400 mt-0.5">{w.admin_note}</span>
+                  ) : null}
                 </td>
                 <td className="py-3 px-4 text-right">
                   {w.status === 'Pending' ? (

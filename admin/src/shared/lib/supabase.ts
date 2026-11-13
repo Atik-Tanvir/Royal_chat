@@ -44,9 +44,13 @@ export interface WithdrawalRecord {
   user_name: string;
   user_avatar: string;
   gateway: string;
+  account_number?: string;
   amount: number;
   gems: number;
   status: 'Pending' | 'Approved' | 'Rejected';
+  transaction_id?: string;
+  admin_note?: string;
+  processed_at?: string;
   created_at: string;
 }
 

@@ -280,6 +280,7 @@ CREATE TABLE IF NOT EXISTS public.withdrawals (
     amount NUMERIC(12, 2) NOT NULL,
     gems INT NOT NULL,
     status TEXT DEFAULT 'Pending',
+    transaction_id TEXT DEFAULT '',
     admin_note TEXT DEFAULT '',
     processed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
