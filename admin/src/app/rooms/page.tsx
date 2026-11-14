@@ -15,6 +15,10 @@ import {
   Megaphone,
   Send,
   AlertCircle,
+  Headphones,
+  Volume2,
+  VolumeX,
+  Activity,
 } from 'lucide-react';
 
 interface Seat {
@@ -97,6 +101,17 @@ export default function RoomsPage() {
   const [rooms, setRooms] = useState(mockRooms);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [activeMonitorRoomId, setActiveMonitorRoomId] = useState<string | null>(null);
+  const [isListeningMuted, setIsListeningMuted] = useState(false);
+  const [listenerVolume, setListenerVolume] = useState(80);
+
+  function toggleListenIn(roomId: string) {
+    if (activeMonitorRoomId === roomId) {
+      setActiveMonitorRoomId(null);
+    } else {
+      setActiveMonitorRoomId(roomId);
+    }
+  }
 
   useEffect(() => {
     async function loadRooms() {
@@ -186,6 +201,8 @@ export default function RoomsPage() {
     return true;
   });
 
+  const monitoredRoom = rooms.find((r) => r.id === activeMonitorRoomId);
+
   return (
     <div className="space-y-6">
       {/* Header (No Subtitle) */}
@@ -224,6 +241,85 @@ export default function RoomsPage() {
         </div>
       </div>
 
+      {/* Live Audio Room Web Monitor (Listen-In Panel) */}
+      {monitoredRoom && (
+        <div className="p-4 rounded-2xl glass-panel border border-emerald-500/40 bg-gradient-to-r from-emerald-950/40 via-black/60 to-slate-950/80 shadow-lg shadow-emerald-950/30">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                <Headphones className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    LIVE AUDIO STREAM (SILENT ADMIN)
+                  </span>
+                  <span className="text-xs font-mono text-slate-400">{monitoredRoom.id}</span>
+                </div>
+                <h4 className="text-sm font-black text-white mt-0.5 flex items-center gap-1.5">
+                  <span>{monitoredRoom.title}</span>
+                  <span className="text-xs font-normal text-slate-400">({monitoredRoom.host_name})</span>
+                </h4>
+              </div>
+            </div>
+
+            {/* Audio Visualizer & Controls */}
+            <div className="flex items-center gap-4 bg-black/40 px-3.5 py-2 rounded-xl border border-white/5">
+              {/* Equalizer Wave simulation */}
+              <div className="flex items-end gap-1 h-5 w-16">
+                {[40, 90, 60, 100, 75, 45].map((h, i) => (
+                  <span
+                    key={i}
+                    style={{ height: isListeningMuted ? '4px' : `${h}%` }}
+                    className={`w-1.5 rounded-full transition-all duration-300 ${
+                      isListeningMuted ? 'bg-slate-600' : 'bg-emerald-400 animate-pulse'
+                    }`}
+                  />
+                ))}
+              </div>
+
+              {/* Volume Slider */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsListeningMuted(!isListeningMuted)}
+                  className="text-slate-400 hover:text-white"
+                  title={isListeningMuted ? 'Unmute' : 'Mute'}
+                >
+                  {isListeningMuted ? (
+                    <VolumeX className="w-4 h-4 text-rose-400" />
+                  ) : (
+                    <Volume2 className="w-4 h-4 text-emerald-400" />
+                  )}
+                </button>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={isListeningMuted ? 0 : listenerVolume}
+                  onChange={(e) => {
+                    setListenerVolume(Number(e.target.value));
+                    if (isListeningMuted) setIsListeningMuted(false);
+                  }}
+                  className="w-20 accent-emerald-400 h-1.5 cursor-pointer bg-slate-800 rounded-lg"
+                />
+                <span className="text-[11px] font-mono text-slate-300 w-7 text-right">
+                  {isListeningMuted ? '0%' : `${listenerVolume}%`}
+                </span>
+              </div>
+
+              {/* Stop Button */}
+              <button
+                onClick={() => setActiveMonitorRoomId(null)}
+                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-rose-500/20 hover:text-rose-300 text-xs font-bold text-slate-300 transition-colors"
+              >
+                Stop
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Search Bar */}
       <div className="relative">
         <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
@@ -241,7 +337,11 @@ export default function RoomsPage() {
         {filteredRooms.map((room) => (
           <div
             key={room.id}
-            className="rounded-2xl glass-panel p-5 border border-[#1C3830] flex flex-col justify-between hover:border-emerald-500/40 transition-all duration-200"
+            className={`rounded-2xl glass-panel p-5 border flex flex-col justify-between transition-all duration-200 ${
+              activeMonitorRoomId === room.id
+                ? 'border-emerald-500 ring-2 ring-emerald-500/30 bg-emerald-950/20 shadow-lg shadow-emerald-950/40'
+                : 'border-[#1C3830] hover:border-emerald-500/40'
+            }`}
           >
             <div>
               <div className="flex items-start justify-between gap-3 mb-3">
@@ -325,7 +425,19 @@ export default function RoomsPage() {
             </div>
 
             {/* Room Footer Actions */}
-            <div className="pt-3 border-t border-[#1C3830] flex items-center justify-end">
+            <div className="pt-3 border-t border-[#1C3830] flex items-center justify-between">
+              <button
+                onClick={() => toggleListenIn(room.id)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${
+                  activeMonitorRoomId === room.id
+                    ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md shadow-emerald-500/30 font-black'
+                    : 'bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/30 text-emerald-300'
+                }`}
+              >
+                <Headphones className="w-3.5 h-3.5" />
+                <span>{activeMonitorRoomId === room.id ? 'Listening...' : 'Listen In'}</span>
+              </button>
+
               <button
                 onClick={() => terminateRoom(room.id)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 text-xs font-bold transition-colors"

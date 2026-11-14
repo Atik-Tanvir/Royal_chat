@@ -158,7 +158,7 @@ export default function NotificationsPage() {
                   </Badge>
                 </div>
                 <p className="text-xs text-slate-300 leading-relaxed max-w-3xl">{msg.content}</p>
-                <span className="text-[10px] text-slate-500 mt-1.5 block font-mono">
+                <span className="text-[10px] text-slate-500 mt-1.5 block font-mono" suppressHydrationWarning>
                   {formatDate(msg.created_at)}
                 </span>
               </div>

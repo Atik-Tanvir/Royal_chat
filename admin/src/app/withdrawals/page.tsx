@@ -13,6 +13,8 @@ import {
   Wallet,
   Copy,
   Sparkles,
+  Download,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 const mockWithdrawals: WithdrawalRecord[] = [
@@ -58,6 +60,55 @@ export default function WithdrawalsPage() {
   const [actionType, setActionType] = useState<'approve' | 'reject'>('approve');
   const [proofNote, setProofNote] = useState('');
   const [copiedTarget, setCopiedTarget] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  function exportWithdrawalsCSV() {
+    const dataToExport = filtered.length > 0 ? filtered : withdrawals;
+    const headers = [
+      'ID',
+      'Date',
+      'User Name',
+      'User ID',
+      'Gateway',
+      'Account / Phone Number',
+      'Amount (USD)',
+      'Gems',
+      'Status',
+      'Transaction ID',
+      'Admin Note',
+    ];
+
+    const rows = dataToExport.map((w) => [
+      `"${w.id}"`,
+      `"${w.created_at || ''}"`,
+      `"${(w.user_name || '').replace(/"/g, '""')}"`,
+      `"${w.user_id || ''}"`,
+      `"${(w.gateway || '').replace(/"/g, '""')}"`,
+      `"${(w.account_number || '').replace(/"/g, '""')}"`,
+      w.amount,
+      w.gems,
+      `"${w.status}"`,
+      `"${(w.transaction_id || '').replace(/"/g, '""')}"`,
+      `"${(w.admin_note || '').replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    const dateStr = new Date().toISOString().split('T')[0];
+    link.setAttribute('download', `gamegala_withdrawals_${filter.toLowerCase()}_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 
   function autoGenerateTrxId() {
     const prefix = activeTx?.gateway?.toUpperCase().includes('BKASH')
@@ -165,20 +216,31 @@ export default function WithdrawalsPage() {
           <span>Withdrawals</span>
         </h2>
 
-        <div className="flex items-center gap-1.5 bg-[#11221D] p-1.5 rounded-xl border border-[#1C3830]">
-          {(['All', 'Pending', 'Approved', 'Rejected'] as const).map((status) => (
-            <button
-              key={status}
-              onClick={() => setFilter(status)}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
-                filter === status
-                  ? 'bg-emerald-500 text-slate-950 shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              {status}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={exportWithdrawalsCSV}
+            title="Download CSV spreadsheet of withdrawal transactions"
+            className="px-3.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export CSV</span>
+          </button>
+
+          <div className="flex items-center gap-1.5 bg-[#11221D] p-1.5 rounded-xl border border-[#1C3830]">
+            {(['All', 'Pending', 'Approved', 'Rejected'] as const).map((status) => (
+              <button
+                key={status}
+                onClick={() => setFilter(status)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
+                  filter === status
+                    ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -286,7 +348,9 @@ export default function WithdrawalsPage() {
               <tr key={w.id} className="hover:bg-white/[0.02] transition-colors">
                 <td className="py-3 px-4 font-mono">
                   <p className="font-bold text-white text-xs">{w.id}</p>
-                  <p className="text-[10px] text-slate-500">{formatDate(w.created_at)}</p>
+                  <p className="text-[10px] text-slate-500" suppressHydrationWarning>
+                    {mounted ? formatDate(w.created_at) : ''}
+                  </p>
                 </td>
                 <td className="py-3 px-4">
                   <div className="flex items-center gap-2">

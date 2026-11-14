@@ -67,6 +67,21 @@ export interface MomentRecord {
   created_at: string;
 }
 
+export interface StoryRecord {
+  id: string;
+  author_id: string;
+  author_name: string;
+  author_avatar?: string;
+  country_flag?: string;
+  media_url?: string;
+  caption?: string;
+  bg_gradient_index?: number;
+  views_count?: number;
+  likes_count?: number;
+  created_at: string;
+  expires_at?: string;
+}
+
 export interface SystemMessageRecord {
   id: string;
   title: string;
