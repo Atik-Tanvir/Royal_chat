@@ -67,10 +67,11 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
           'id': currentUserId,
           'nickname': defaultName,
           'avatar_url': defaultAvatar,
-          'country': 'Bangladesh',
-          'country_flag': '🇧🇩',
-          'gender': '♂ 20',
-          'age': 20,
+          'country': AuthSessionManager.currentUserCountry ?? 'Bangladesh',
+          'country_flag': AuthSessionManager.currentUserCountryFlag ?? '🇧🇩',
+          'gender': AuthSessionManager.currentUserGender ?? '♂ 20',
+          'age': AuthSessionManager.currentUserAge ?? 20,
+          'bio': AuthSessionManager.currentUserBio ?? '',
           'level': 1,
           'is_vip': false,
           'coin_balance': 5000,
@@ -91,13 +92,21 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
 
       UserProfile currentProfile = state.profile;
       if (profileRes != null) {
+        final country = profileRes['country'] as String? ?? AuthSessionManager.currentUserCountry ?? 'Bangladesh';
+        final countryFlag = profileRes['country_flag'] as String? ?? _flagForCountry(country);
+        final bio = profileRes['bio'] as String? ?? AuthSessionManager.currentUserBio ?? '';
+        final language = AuthSessionManager.currentUserLanguage ?? 'English';
+
         currentProfile = UserProfile(
           userId: profileRes['id'] as String? ?? currentUserId,
           nickname: profileRes['nickname'] as String? ?? defaultName,
           avatarUrl: profileRes['avatar_url'] as String? ?? defaultAvatar,
-          country: profileRes['country'] as String? ?? 'Bangladesh',
-          gender: profileRes['gender'] as String? ?? '♂ 20',
-          age: (profileRes['age'] as num?)?.toInt() ?? 20,
+          country: country,
+          countryFlag: countryFlag,
+          language: language,
+          bio: bio,
+          gender: profileRes['gender'] as String? ?? AuthSessionManager.currentUserGender ?? '♂ 20',
+          age: (profileRes['age'] as num?)?.toInt() ?? AuthSessionManager.currentUserAge ?? 20,
           level: (profileRes['level'] as num?)?.toInt() ?? 1,
           isVip: profileRes['is_vip'] as bool? ?? false,
           friendsCount: (profileRes['friends_count'] as num?)?.toInt() ?? 0,
@@ -367,13 +376,25 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     UpdateProfileDetailsEvent event,
     Emitter<ProfileState> emit,
   ) async {
+    final newCountry = event.country ?? state.profile.country;
+    final newFlag = event.countryFlag ?? (event.country != null ? _flagForCountry(newCountry) : state.profile.countryFlag);
+    final newLanguage = event.language ?? state.profile.language;
+    final newBio = event.bio ?? state.profile.bio;
+    final newNickname = event.nickname ?? state.profile.nickname;
+    final newAvatar = event.avatarUrl ?? state.profile.avatarUrl;
+    final newGender = event.gender ?? state.profile.gender;
+    final newAge = event.age ?? state.profile.age;
+
     final updatedProfile = UserProfile(
       userId: state.profile.userId,
-      nickname: event.nickname ?? state.profile.nickname,
-      avatarUrl: event.avatarUrl ?? state.profile.avatarUrl,
-      country: event.country ?? state.profile.country,
-      gender: event.gender ?? state.profile.gender,
-      age: event.age ?? state.profile.age,
+      nickname: newNickname,
+      avatarUrl: newAvatar,
+      country: newCountry,
+      countryFlag: newFlag,
+      language: newLanguage,
+      bio: newBio,
+      gender: newGender,
+      age: newAge,
       level: state.profile.level,
       isVip: state.profile.isVip,
       friendsCount: state.profile.friendsCount,
@@ -386,13 +407,28 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
 
     emit(state.copyWith(profile: updatedProfile));
 
+    // Save locally to session
+    await AuthSessionManager.saveProfileDetails(
+      name: newNickname,
+      avatarUrl: newAvatar,
+      country: newCountry,
+      countryFlag: newFlag,
+      language: newLanguage,
+      bio: newBio,
+      gender: newGender,
+      age: newAge,
+    );
+
+    // Save to remote Supabase
     try {
       final updates = <String, dynamic>{};
       if (event.nickname != null) updates['nickname'] = event.nickname;
       if (event.avatarUrl != null) updates['avatar_url'] = event.avatarUrl;
       if (event.country != null) updates['country'] = event.country;
+      if (newFlag.isNotEmpty) updates['country_flag'] = newFlag;
       if (event.gender != null) updates['gender'] = event.gender;
       if (event.age != null) updates['age'] = event.age;
+      if (event.bio != null) updates['bio'] = event.bio;
 
       if (updates.isNotEmpty) {
         await SupabaseConfig.client
@@ -426,6 +462,9 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       nickname: state.profile.nickname,
       avatarUrl: state.profile.avatarUrl,
       country: state.profile.country,
+      countryFlag: state.profile.countryFlag,
+      language: state.profile.language,
+      bio: state.profile.bio,
       gender: state.profile.gender,
       age: state.profile.age,
       level: state.profile.level,
@@ -441,13 +480,27 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
 
   static ProfileState _createInitialState() {
     final activeId = AuthSessionManager.currentUserId ?? '';
+    final activeName = AuthSessionManager.currentUserName;
+    final activeAvatar = AuthSessionManager.currentUserAvatar ?? '';
+    final country = AuthSessionManager.currentUserCountry ?? 'Bangladesh';
+    final flag = AuthSessionManager.currentUserCountryFlag ?? _flagForCountry(country);
+    final lang = AuthSessionManager.currentUserLanguage ?? 'English';
+    final bio = AuthSessionManager.currentUserBio ?? '';
+    final gender = AuthSessionManager.currentUserGender ?? '♂ 20';
+    final age = AuthSessionManager.currentUserAge ?? 20;
+
     final profile = UserProfile(
       userId: activeId,
-      nickname: activeId.isNotEmpty ? activeId : 'Royal User',
-      avatarUrl: '',
-      country: 'Bangladesh',
-      gender: '♂ 20',
-      age: 20,
+      nickname: (activeName != null && activeName.isNotEmpty)
+          ? activeName
+          : (activeId.isNotEmpty ? activeId : 'Royal User'),
+      avatarUrl: activeAvatar,
+      country: country,
+      countryFlag: flag,
+      language: lang,
+      bio: bio,
+      gender: gender,
+      age: age,
       level: 1,
       isVip: false,
       friendsCount: 0,
@@ -458,5 +511,55 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       coinBalance: 5000.0,
     );
     return ProfileState(profile: profile);
+  }
+
+  static String _flagForCountry(String country) {
+    switch (country.toLowerCase().trim()) {
+      case 'bangladesh':
+        return '🇧🇩';
+      case 'india':
+        return '🇮🇳';
+      case 'pakistan':
+        return '🇵🇰';
+      case 'saudi arabia':
+        return '🇸🇦';
+      case 'united arab emirates':
+      case 'uae':
+        return '🇦🇪';
+      case 'united states':
+      case 'usa':
+        return '🇺🇸';
+      case 'united kingdom':
+      case 'uk':
+        return '🇬🇧';
+      case 'canada':
+        return '🇨🇦';
+      case 'malaysia':
+        return '🇲🇾';
+      case 'indonesia':
+        return '🇮🇩';
+      case 'nepal':
+        return '🇳🇵';
+      case 'qatar':
+        return '🇶🇦';
+      case 'kuwait':
+        return '🇰🇼';
+      case 'oman':
+        return '🇴🇲';
+      case 'turkey':
+        return '🇹🇷';
+      case 'germany':
+        return '🇩🇪';
+      case 'france':
+        return '🇫🇷';
+      case 'italy':
+        return '🇮🇹';
+      case 'japan':
+        return '🇯🇵';
+      case 'brazil':
+        return '🇧🇷';
+      default:
+        return '🌐';
+    }
   }
 }

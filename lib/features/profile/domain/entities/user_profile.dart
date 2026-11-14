@@ -5,6 +5,9 @@ class UserProfile extends Equatable {
   final String nickname;
   final String avatarUrl;
   final String country;
+  final String countryFlag;
+  final String language;
+  final String bio;
   final String gender;
   final int age;
   final int level;
@@ -21,6 +24,9 @@ class UserProfile extends Equatable {
     required this.nickname,
     required this.avatarUrl,
     required this.country,
+    this.countryFlag = '🇧🇩',
+    this.language = 'English',
+    this.bio = '',
     required this.gender,
     required this.age,
     required this.level,
@@ -50,6 +56,9 @@ class UserProfile extends Equatable {
         nickname,
         avatarUrl,
         country,
+        countryFlag,
+        language,
+        bio,
         gender,
         age,
         level,

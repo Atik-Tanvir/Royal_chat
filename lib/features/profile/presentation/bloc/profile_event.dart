@@ -84,6 +84,9 @@ class UpdateProfileDetailsEvent extends ProfileEvent {
   final String? nickname;
   final String? avatarUrl;
   final String? country;
+  final String? countryFlag;
+  final String? language;
+  final String? bio;
   final String? gender;
   final int? age;
 
@@ -91,12 +94,24 @@ class UpdateProfileDetailsEvent extends ProfileEvent {
     this.nickname,
     this.avatarUrl,
     this.country,
+    this.countryFlag,
+    this.language,
+    this.bio,
     this.gender,
     this.age,
   });
 
   @override
-  List<Object?> get props => [nickname, avatarUrl, country, gender, age];
+  List<Object?> get props => [
+        nickname,
+        avatarUrl,
+        country,
+        countryFlag,
+        language,
+        bio,
+        gender,
+        age,
+      ];
 }
 
 class SignOutEvent extends ProfileEvent {}

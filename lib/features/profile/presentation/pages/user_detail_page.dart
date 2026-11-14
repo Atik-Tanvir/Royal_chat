@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/config/auth_session_manager.dart';
-import '../../../../core/services/r2_storage_service.dart';
 import '../../../../core/widgets/custom_avatar.dart';
 import '../../../../core/widgets/royal_brand_logo.dart';
 import '../../../calls/presentation/pages/one_on_one_call_page.dart';
 import '../bloc/profile_bloc.dart';
-import '../bloc/profile_event.dart';
 import '../bloc/profile_state.dart';
-import '../../../../core/config/supabase_config.dart';
+import '../../domain/entities/user_profile.dart';
+import '../widgets/edit_profile_sheet.dart';
 
 class UserDetailPage extends StatefulWidget {
   final String userId;
@@ -45,169 +42,8 @@ class _UserDetailPageState extends State<UserDetailPage> with SingleTickerProvid
     super.dispose();
   }
 
-  void _showEditProfileSheet(BuildContext context, String currentName, String currentAvatar) {
-    final nameController = TextEditingController(text: currentName);
-    String avatarUrl = currentAvatar;
-    bool isUploading = false;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetCtx) => StatefulBuilder(
-        builder: (context, setModalState) {
-          return Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: const BoxDecoration(
-                color: Color(0xFF0F2B22),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Edit Royal Profile',
-                        style: TextStyle(color: AppColors.goldCoin, fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white60),
-                        onPressed: () => Navigator.pop(sheetCtx),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Avatar Picker Circle
-                  Center(
-                    child: GestureDetector(
-                      onTap: isUploading
-                          ? null
-                          : () async {
-                              try {
-                                final picker = ImagePicker();
-                                final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
-                                if (file == null) return;
-
-                                setModalState(() => isUploading = true);
-                                final bytes = await file.readAsBytes();
-                                final ext = file.name.contains('.') ? file.name.split('.').last : 'jpg';
-                                final user = SupabaseConfig.client.auth.currentUser;
-                                final currentUid = user?.id ?? widget.userId;
-                                final uploadedUrl = await R2StorageService.instance.uploadAvatar(
-                                  bytes: bytes,
-                                  userId: currentUid,
-                                  extension: ext,
-                                );
-
-                                setModalState(() {
-                                  if (uploadedUrl != null) avatarUrl = uploadedUrl;
-                                  isUploading = false;
-                                });
-                              } catch (e) {
-                                setModalState(() => isUploading = false);
-                              }
-                            },
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: AppColors.goldCoin, width: 2),
-                              image: avatarUrl.isNotEmpty
-                                  ? DecorationImage(image: NetworkImage(avatarUrl), fit: BoxFit.cover)
-                                  : null,
-                              color: const Color(0xFF07382D),
-                            ),
-                            child: avatarUrl.isEmpty
-                                ? const Center(child: RoyalBrandLogo(size: 50))
-                                : null,
-                          ),
-                          if (isUploading)
-                            const CircularProgressIndicator(color: AppColors.gemEmerald)
-                          else
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(color: AppColors.gemEmerald, shape: BoxShape.circle),
-                                child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Nickname Input
-                  TextField(
-                    controller: nameController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Display Nickname',
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      filled: true,
-                      fillColor: Colors.black26,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.gemEmerald,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () {
-                      final newName = nameController.text.trim();
-                      if (newName.isEmpty) return;
-
-                      context.read<ProfileBloc>().add(
-                            UpdateProfileDetailsEvent(
-                              nickname: newName,
-                              avatarUrl: avatarUrl.isNotEmpty ? avatarUrl : null,
-                            ),
-                          );
-
-                      final activeUid = widget.userId.isNotEmpty
-                          ? widget.userId
-                          : (AuthSessionManager.currentUserId ?? '');
-
-                      AuthSessionManager.saveSession(
-                        userId: activeUid,
-                        name: newName,
-                        email: AuthSessionManager.currentUserEmail ?? '',
-                        avatarUrl: avatarUrl,
-                      );
-
-                      Navigator.pop(sheetCtx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Profile updated and saved to Supabase!'),
-                          backgroundColor: AppColors.gemEmerald,
-                        ),
-                      );
-                    },
-                    child: const Text('Save Profile Changes', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
+  void _showEditProfileSheet(BuildContext context) {
+    EditProfileSheet.show(context);
   }
 
   @override
@@ -338,7 +174,7 @@ class _UserDetailPageState extends State<UserDetailPage> with SingleTickerProvid
                       backgroundColor: Colors.black26,
                       child: IconButton(
                         icon: const Icon(Icons.edit_rounded, color: Colors.white, size: 18),
-                        onPressed: () => _showEditProfileSheet(context, currentUsername, currentAvatar),
+                        onPressed: () => _showEditProfileSheet(context),
                       ),
                     ),
                   ],
@@ -410,7 +246,7 @@ class _UserDetailPageState extends State<UserDetailPage> with SingleTickerProvid
     );
   }
 
-  Widget _buildInfoTab(dynamic profile, String name, String avatar) {
+  Widget _buildInfoTab(UserProfile profile, String name, String avatar) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
       children: [
@@ -421,49 +257,91 @@ class _UserDetailPageState extends State<UserDetailPage> with SingleTickerProvid
                 ? CircleAvatar(radius: 28, backgroundImage: NetworkImage(avatar))
                 : const CustomAvatar(radius: 28),
             const SizedBox(width: 14),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0072FF),
-                    borderRadius: BorderRadius.circular(10),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0072FF),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          profile.gender.isNotEmpty ? profile.gender : '♂ 20',
+                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F7658),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${profile.countryFlag} ${profile.country}',
+                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
                   ),
-                  child: Text(
-                    profile.gender ?? '♂ 19',
-                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.edit_note_rounded, color: AppColors.goldCoin, size: 26),
+              tooltip: 'Edit Profile',
+              onPressed: () => _showEditProfileSheet(context),
             ),
           ],
         ),
         const SizedBox(height: 16),
 
-        // Personal signature
-        const Text(
-          'Royal Chat Live official verified member',
-          style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+        // Personal bio
+        Text(
+          profile.bio.isNotEmpty
+              ? profile.bio
+              : 'Royal Chat Live official verified member ✨',
+          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13, height: 1.4),
         ),
         const SizedBox(height: 16),
 
         // Country & Language Chips
         Row(
           children: [
-            _buildBadgeChip('🇧🇩 ${profile.country ?? 'Bangladesh'}'),
+            _buildBadgeChip('${profile.countryFlag} ${profile.country}'),
             const SizedBox(width: 8),
-            _buildBadgeChip('🌐 English'),
+            _buildBadgeChip('🌐 ${profile.language}'),
           ],
+        ),
+        const SizedBox(height: 16),
+
+        // Quick Edit Profile Banner Button
+        OutlinedButton.icon(
+          onPressed: () => _showEditProfileSheet(context),
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: AppColors.goldCoin, width: 1.2),
+            foregroundColor: AppColors.goldCoin,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+          ),
+          icon: const Icon(Icons.edit_rounded, size: 16),
+          label: const Text(
+            'Edit Personal Info, Country & Language',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
         ),
         const SizedBox(height: 24),
 
@@ -497,7 +375,7 @@ class _UserDetailPageState extends State<UserDetailPage> with SingleTickerProvid
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            '👑 LV${profile.level ?? 1}',
+                            '👑 LV${profile.level}',
                             style: const TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.bold),
                           ),
                         ),

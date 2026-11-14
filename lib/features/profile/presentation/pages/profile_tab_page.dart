@@ -22,6 +22,7 @@ import 'task_center_page.dart';
 import 'backpack_store_page.dart';
 import '../../../games/presentation/pages/bucket_prediction_game_page.dart';
 import '../../../moments/presentation/pages/social_profile_page.dart';
+import '../widgets/edit_profile_sheet.dart';
 
 class ProfileTabPage extends StatelessWidget {
   const ProfileTabPage({super.key});
@@ -69,7 +70,7 @@ class ProfileTabPage extends StatelessWidget {
             builder: (_) => UserDetailPage(
               username: profile.nickname,
               userId: profile.userId,
-              countryFlag: '🇧🇩',
+              countryFlag: profile.countryFlag,
               countryName: profile.country,
             ),
           ),
@@ -90,32 +91,65 @@ class ProfileTabPage extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      profile.nickname,
-                      style: AppTextStyles.headerMedium.copyWith(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    Flexible(
+                      child: Text(
+                        profile.nickname,
+                        style: AppTextStyles.headerMedium.copyWith(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 4),
                     const Icon(Icons.chevron_right, color: Colors.white60, size: 20),
+                    const Spacer(),
+                    InkWell(
+                      onTap: () => EditProfileSheet.show(context),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.goldCoin.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.goldCoin.withValues(alpha: 0.5), width: 1),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.edit_rounded, color: AppColors.goldCoin, size: 12),
+                            SizedBox(width: 4),
+                            Text(
+                              'Edit',
+                              style: TextStyle(
+                                color: AppColors.goldCoin,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
-                // Badges row: Country, Gender/Age, Level, VIP
+                // Badges row: Country, Gender/Age, Language, Level, VIP
                 Wrap(
                   spacing: 6,
                   runSpacing: 4,
                   children: [
                     _buildPillBadge(
                       color: const Color(0xFF137752),
-                      icon: Icons.circle,
-                      iconColor: Colors.red,
-                      label: profile.country,
+                      label: '${profile.countryFlag} ${profile.country}',
                     ),
                     _buildPillBadge(
                       color: const Color(0xFF1976D2),
                       label: profile.gender,
+                    ),
+                    _buildPillBadge(
+                      color: const Color(0xFF5B21B6),
+                      label: '🌐 ${profile.language}',
                     ),
                     _buildDiamondBadge('LV${profile.level}'),
                     _buildVipBadge(),
@@ -548,6 +582,33 @@ class ProfileTabPage extends StatelessWidget {
                 context,
                 MaterialPageRoute(builder: (_) => const SocialProfilePage()),
               );
+            },
+          ),
+          Divider(color: Colors.white.withOpacity(0.06), height: 1),
+          _buildMenuItem(
+            icon: Icons.manage_accounts_rounded,
+            iconColor: AppColors.goldCoin,
+            title: 'Edit Profile & Personal Info',
+            trailingWidget: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.goldCoin.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.goldCoin, width: 0.8),
+                  ),
+                  child: const Text(
+                    'Edit',
+                    style: TextStyle(color: AppColors.goldCoin, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Colors.white54, size: 20),
+              ],
+            ),
+            onTap: () {
+              EditProfileSheet.show(context);
             },
           ),
           Divider(color: Colors.white.withOpacity(0.06), height: 1),
