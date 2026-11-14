@@ -139,7 +139,6 @@ class _BalloonSkyViewContentState extends State<_BalloonSkyViewContent> {
 
           final isPlayingOrPaused = state.phase == BalloonGamePhase.playing ||
               state.phase == BalloonGamePhase.paused;
-          final isDouble = state.playMode == BalloonPlayMode.doubleStake;
 
           return Container(
             decoration: BoxDecoration(
@@ -256,38 +255,63 @@ class _BalloonSkyViewContentState extends State<_BalloonSkyViewContent> {
                   if (!state.gamesConfig.isGamePlayable('game_balloon_sky'))
                     const GameFrozenBanner(),
 
-                  // Mode Selector: Free Play (Earn) vs Double Stake (2x Speed+)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+                  // Target Score & Payout Goal Banner
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFFFBBF24).withValues(alpha: 0.8),
+                        width: 1.2,
+                      ),
+                    ),
                     child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(
-                          child: _buildModeCard(
-                            label: '🆓 Free Earn',
-                            sub: 'No Risk • +${state.goldBubbleCoins}/+${state.standardBubbleCoins} Bubbles',
-                            isSelected: !isDouble,
-                            accentColor: const Color(0xFF38BDF8),
-                            enabled: !isPlayingOrPaused,
-                            onTap: () => gameBloc.add(
-                              const SelectBalloonPlayModeEvent(
-                                BalloonPlayMode.freeEarn,
-                              ),
+                        Row(
+                          children: [
+                            const Text('🎯', style: TextStyle(fontSize: 16)),
+                            const SizedBox(width: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Target: ${state.targetScore} pts (Min to Win)',
+                                  style: const TextStyle(
+                                    color: Color(0xFFFBBF24),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                Text(
+                                  'Invest coins • Dodge spikes • Reach ${state.targetScore} pts to win!',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildModeCard(
-                            label:
-                                '💎 ${GamesControlConfig.formatMultiplier(state.doubleStakeMultiplier)} Double Stake',
-                            sub: 'Speed+ • Clear ${state.doubleTargetSeconds}s Goal',
-                            isSelected: isDouble,
-                            accentColor: const Color(0xFFFBBF24),
-                            enabled: !isPlayingOrPaused,
-                            onTap: () => gameBloc.add(
-                              const SelectBalloonPlayModeEvent(
-                                BalloonPlayMode.doubleStake,
-                              ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFF34D399)),
+                          ),
+                          child: Text(
+                            'Payout ${GamesControlConfig.formatMultiplier(state.doubleStakeMultiplier)}',
+                            style: const TextStyle(
+                              color: Color(0xFF34D399),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 11,
                             ),
                           ),
                         ),
@@ -308,6 +332,7 @@ class _BalloonSkyViewContentState extends State<_BalloonSkyViewContent> {
                       activeRunStake: state.activeRunStake,
                       bestScore: state.bestScore,
                       lastRunSummary: state.lastRunSummary,
+                      targetScore: state.targetScore,
                       doubleTargetSeconds: state.doubleTargetSeconds,
                       doubleStakeMultiplier: state.doubleStakeMultiplier,
                       standardBubbleCoins: state.standardBubbleCoins,
@@ -333,89 +358,77 @@ class _BalloonSkyViewContentState extends State<_BalloonSkyViewContent> {
                     ),
                   ),
 
-                  // Coin Stake Selector shown in 2x Double Stake mode before launch
-                  if (isDouble)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                      child: AbsorbPointer(
-                        absorbing: isPlayingOrPaused,
-                        child: Opacity(
-                          opacity: isPlayingOrPaused ? 0.5 : 1.0,
-                          child: GameCoinControlsBar(
-                            controller: _stakeController,
-                            currentAmount: state.stakeInputAmount,
-                            onDecrement: () => gameBloc.add(
-                              const StepBalloonStakeCoinEvent(
-                                isIncrement: false,
+                  // Mandatory Coin Investment Selector (Active before flight launch)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AbsorbPointer(
+                          absorbing: isPlayingOrPaused,
+                          child: Opacity(
+                            opacity: isPlayingOrPaused ? 0.5 : 1.0,
+                            child: GameCoinControlsBar(
+                              controller: _stakeController,
+                              currentAmount: state.stakeInputAmount,
+                              onDecrement: () => gameBloc.add(
+                                const StepBalloonStakeCoinEvent(
+                                  isIncrement: false,
+                                ),
                               ),
-                            ),
-                            onIncrement: () => gameBloc.add(
-                              const StepBalloonStakeCoinEvent(
-                                isIncrement: true,
+                              onIncrement: () => gameBloc.add(
+                                const StepBalloonStakeCoinEvent(
+                                  isIncrement: true,
+                                ),
                               ),
-                            ),
-                            onTextChanged: (txt) => gameBloc.add(
-                              UpdateBalloonCustomStakeTextEvent(txt),
-                            ),
-                            onPresetSelected: (val) => gameBloc.add(
-                              SetBalloonPresetStakeEvent(val),
+                              onTextChanged: (txt) => gameBloc.add(
+                                UpdateBalloonCustomStakeTextEvent(txt),
+                              ),
+                              onPresetSelected: (val) => gameBloc.add(
+                                SetBalloonPresetStakeEvent(val),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    )
-                  else
-                    const SizedBox(height: 10),
+                        // Prominent Watch Ad Option to get coins if balance is low or zero
+                        if (balance < state.stakeInputAmount)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFF59E0B),
+                                  foregroundColor: Colors.black,
+                                  padding: const EdgeInsets.symmetric(vertical: 9),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: () => gameBloc.add(
+                                  const FetchBalloonRewardedAdsEvent(
+                                    openDialogAfterFetch: true,
+                                  ),
+                                ),
+                                icon: const Icon(Icons.video_collection_rounded, size: 18),
+                                label: Text(
+                                  '📺 Need Coins? Watch Ad for +${state.rewardedAdsConfig.rewardCoins} Free Coins',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildModeCard({
-    required String label,
-    required String sub,
-    required bool isSelected,
-    required Color accentColor,
-    required bool enabled,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: enabled ? onTap : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? accentColor.withValues(alpha: 0.2)
-              : Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? accentColor : Colors.white12,
-            width: isSelected ? 1.6 : 1.0,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? accentColor : Colors.white,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 1),
-            Text(
-              sub,
-              style: const TextStyle(color: Colors.white60, fontSize: 9.2),
-            ),
-          ],
-        ),
       ),
     );
   }

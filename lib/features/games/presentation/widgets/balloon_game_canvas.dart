@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -6,11 +7,32 @@ import '../../domain/entities/balloon_game_entity.dart';
 import '../../domain/entities/games_control_config.dart';
 import '../bloc/balloon_game_bloc.dart';
 
+/// Active popping visual effect spawned when balloons/bubbles are popped or collected.
+class BalloonPopEffect {
+  final Offset position;
+  final Color color;
+  final String? text;
+  double progress; // 0.0 to 1.0
+  final List<Offset> particleVelocities;
+  final List<Color> particleColors;
+  final bool isCrash;
+
+  BalloonPopEffect({
+    required this.position,
+    required this.color,
+    this.text,
+    this.progress = 0.0,
+    required this.particleVelocities,
+    required this.particleColors,
+    this.isCrash = false,
+  });
+}
+
 /// 60fps interactive Hot Air Balloon playfield matching the Play Store offline game UI:
 /// - Clean pure white background, top-left formatted score (`911 155` style), top-right pause
-/// - Yellow-Blue-Red striped hot air balloon steered smoothly via drag/touch
+/// - Yellow-Blue-Red striped hot air balloon steered smoothly via drag/touch/scroll
 /// - Horizontal black spike bars with downward teeth, outlined floating bubbles,
-///   yellow shield ring, magnet ring, and sharp speed boost past 40 seconds
+///   pop particle bursts, and sharp speed boost past 40 seconds
 class BalloonGameCanvas extends StatefulWidget {
   final BalloonGamePhase phase;
   final BalloonPlayMode playMode;
@@ -18,6 +40,7 @@ class BalloonGameCanvas extends StatefulWidget {
   final int activeRunStake;
   final int bestScore;
   final BalloonRunSummary? lastRunSummary;
+  final int targetScore;
   final int doubleTargetSeconds;
   final double doubleStakeMultiplier;
   final int standardBubbleCoins;
@@ -40,6 +63,7 @@ class BalloonGameCanvas extends StatefulWidget {
     required this.activeRunStake,
     required this.bestScore,
     required this.lastRunSummary,
+    this.targetScore = 1000,
     this.doubleTargetSeconds = 40,
     this.doubleStakeMultiplier = 2.0,
     this.standardBubbleCoins = 10,
@@ -81,6 +105,7 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
   // Dynamic entities
   final List<BalloonSpikeBar> _spikes = [];
   final List<BalloonBubble> _bubbles = [];
+  final List<BalloonPopEffect> _popEffects = [];
   double _spikeSpawnDist = 0.0;
   double _bubbleSpawnDist = 0.0;
   bool _hasReportedFinish = false;
@@ -151,6 +176,7 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
         BalloonBubble(xNorm: 0.39, yNorm: 0.89),
         BalloonBubble(xNorm: 0.80, yNorm: 0.89),
       ]);
+    _popEffects.clear();
   }
 
   void _resetForNewRun() {
@@ -160,12 +186,13 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
     _scoreAccumulator = 0.0;
     _score = 0;
     _bubbleCoins = 0;
-    _shieldSeconds = 2.0; // Brief 2s launch grace shield
+    _shieldSeconds = 1.0; // Brief 1s launch grace shield
     _magnetSeconds = 0.0;
     _slowSeconds = 0.0;
     _spikeSpawnDist = 0.15;
     _bubbleSpawnDist = 0.0;
     _hasReportedFinish = false;
+    _popEffects.clear();
 
     final isDouble = widget.playMode == BalloonPlayMode.doubleStake;
     _speedMultiplier = BalloonGameBloc.calculateSpeedMultiplier(
@@ -190,6 +217,42 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
       ]);
   }
 
+  void _spawnPopEffect(
+    Offset center,
+    Color color, {
+    String? text,
+    int particleCount = 8,
+    bool isCrash = false,
+  }) {
+    final velocities = <Offset>[];
+    final colors = <Color>[];
+    for (int i = 0; i < particleCount; i++) {
+      final angle = (i / particleCount) * 2 * pi + (_rng.nextDouble() * 0.4);
+      final speed = (isCrash ? 75.0 : 40.0) + _rng.nextDouble() * 45.0;
+      velocities.add(Offset(cos(angle) * speed, sin(angle) * speed));
+      if (isCrash) {
+        const crashPalette = [
+          Color(0xFFFACC15),
+          Color(0xFF2563EB),
+          Color(0xFFEF4444),
+          Colors.white,
+          Color(0xFFF97316),
+        ];
+        colors.add(crashPalette[i % crashPalette.length]);
+      } else {
+        colors.add(color);
+      }
+    }
+    _popEffects.add(BalloonPopEffect(
+      position: center,
+      color: color,
+      text: text,
+      particleVelocities: velocities,
+      particleColors: colors,
+      isCrash: isCrash,
+    ));
+  }
+
   void _onFrameTick(Duration elapsed) {
     final dt = (elapsed - _lastTick).inMicroseconds / 1000000.0;
     _lastTick = elapsed;
@@ -206,6 +269,12 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
       if (_shieldSeconds > 0) _shieldSeconds = max(0.0, _shieldSeconds - dt);
       if (_magnetSeconds > 0) _magnetSeconds = max(0.0, _magnetSeconds - dt);
       if (_slowSeconds > 0) _slowSeconds = max(0.0, _slowSeconds - dt);
+
+      // Advance pop particle bursts & floating texts
+      for (final e in _popEffects) {
+        e.progress += dt * (e.isCrash ? 1.6 : 2.5);
+      }
+      _popEffects.removeWhere((e) => e.progress >= 1.0);
 
       _speedMultiplier = BalloonGameBloc.calculateSpeedMultiplier(
         elapsedSeconds: _elapsedSeconds,
@@ -224,11 +293,12 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
       _spikeSpawnDist += scrollStep;
       _bubbleSpawnDist += scrollStep;
 
-      // Move spikes downward
+      // Move spikes downward (recording prevYNorm to prevent high-speed tunneling)
       for (final s in _spikes) {
+        s.prevYNorm = s.yNorm;
         s.yNorm += scrollStep;
       }
-      _spikes.removeWhere((s) => s.yNorm > 1.12);
+      _spikes.removeWhere((s) => s.yNorm > 1.15);
 
       // Spawn new spikes with guaranteed passable corridor
       final double spawnInterval = max(0.16, 0.29 - (_speedMultiplier * 0.015));
@@ -237,20 +307,22 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
         _spawnNextSpikeBar();
       }
 
-      // Move bubbles & pull toward balloon if magnet is active
+      // Move bubbles straight down (no auto magnet pull - player must steer & scroll to collect)
       for (final b in _bubbles) {
         b.yNorm += scrollStep * 0.94;
-        if (_magnetSeconds > 0 && b.powerUp == null) {
-          final dx = _balloonX - b.xNorm;
-          final dy = _balloonY - b.yNorm;
-          final dist = sqrt(dx * dx + dy * dy);
-          if (dist < 0.42 && dist > 0.001) {
-            b.xNorm += (dx / dist) * dt * 0.65;
-            b.yNorm += (dy / dist) * dt * 0.65;
-          }
-        }
       }
-      _bubbles.removeWhere((b) => b.yNorm > 1.08);
+      // When bubbles fall off bottom, trigger small popping burst
+      _bubbles.removeWhere((b) {
+        if (b.yNorm > 1.05) {
+          _spawnPopEffect(
+            Offset(b.xNorm * _canvasSize.width, _canvasSize.height - 8),
+            b.isCoinBubble ? const Color(0xFFF59E0B) : const Color(0xFF9CA3AF),
+            particleCount: 5,
+          );
+          return true;
+        }
+        return false;
+      });
 
       if (_bubbleSpawnDist >= 0.14) {
         _bubbleSpawnDist = 0.0;
@@ -314,6 +386,7 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
   }
 
   void _checkCollisions() {
+    if (widget.phase != BalloonGamePhase.playing || _hasReportedFinish) return;
     final w = _canvasSize.width;
     final h = _canvasSize.height;
     final bx = _balloonX * w;
@@ -322,9 +395,9 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
     // Balloon envelope center sits slightly above basket
     final envCenterX = bx;
     final envCenterY = by - 4;
-    const double collectRadius = 28.0;
+    const double collectRadius = 26.0;
 
-    // 1. Collect bubbles & power-ups
+    // 1. Collect bubbles & power-ups with pop particles and floating labels
     _bubbles.removeWhere((b) {
       final px = b.xNorm * w;
       final py = b.yNorm * h;
@@ -333,47 +406,67 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
         if (b.powerUp != null) {
           switch (b.powerUp!) {
             case BalloonPowerUpType.shield:
-              _shieldSeconds = 8.0;
+              _shieldSeconds = 6.0;
               _score += 25;
+              _spawnPopEffect(Offset(px, py), const Color(0xFFFACC15), text: '🛡️ SHIELD!', particleCount: 10);
               break;
             case BalloonPowerUpType.magnet:
-              _magnetSeconds = 10.0;
+              _magnetSeconds = 8.0;
               _score += 25;
+              _spawnPopEffect(Offset(px, py), const Color(0xFF0EA5E9), text: '🧲 MAGNET!', particleCount: 10);
               break;
             case BalloonPowerUpType.slower:
               _slowSeconds = 6.0;
               _score += 25;
+              _spawnPopEffect(Offset(px, py), const Color(0xFF9333EA), text: '⏳ SLOW!', particleCount: 10);
               break;
           }
         } else if (b.isCoinBubble) {
           _score += 25;
           _bubbleCoins += widget.goldBubbleCoins;
+          _spawnPopEffect(Offset(px, py), const Color(0xFFF59E0B), text: '+${widget.goldBubbleCoins}', particleCount: 8);
         } else {
           _score += 10;
           _bubbleCoins += widget.standardBubbleCoins;
+          _spawnPopEffect(Offset(px, py), const Color(0xFF38BDF8), text: '+10', particleCount: 6);
         }
         return true;
       }
       return false;
     });
 
-    // 2. Check Spike Bar Collision (forgiving rim hitbox so near-misses feel fair)
-    if (_shieldSeconds <= 0) {
-      // Balloon ellipse bounding box (~32x42 total height including basket)
-      final bLeft = bx - 13.5;
-      final bRight = bx + 13.5;
-      final bTop = by - 21.0;
-      final bBottom = by + 20.0;
+    // 2. Check Spike Bar Collision (Anti-tunneling swept hitbox across frame displacement)
+    final bLeft = bx - 13.5;
+    final bRight = bx + 13.5;
+    final bTop = by - 21.0;
+    final bBottom = by + 20.0;
 
-      for (final s in _spikes) {
-        final sLeft = s.xNorm * w + 2;
-        final sRight = (s.xNorm + s.widthNorm) * w - 2;
-        final sTop = s.yNorm * h;
-        final sBottom = sTop + 13.5;
+    for (final s in _spikes) {
+      final sLeft = s.xNorm * w + 1.0;
+      final sRight = (s.xNorm + s.widthNorm) * w - 1.0;
+      // Swept bounding box covers displacement between previous frame and current frame + full 24px barrier height
+      final minY = min(s.prevYNorm, s.yNorm) * h - 2.0;
+      final maxY = max(s.prevYNorm, s.yNorm) * h + 24.0;
 
-        final overlapsX = bRight > sLeft && bLeft < sRight;
-        final overlapsY = bBottom > sTop && bTop < sBottom;
-        if (overlapsX && overlapsY) {
+      final overlapsX = bRight > sLeft && bLeft < sRight;
+      final overlapsY = bBottom > minY && bTop < maxY;
+      if (overlapsX && overlapsY) {
+        if (_shieldSeconds > 0) {
+          _shieldSeconds = 0.0;
+          _spawnPopEffect(
+            Offset(bx, by),
+            const Color(0xFFFACC15),
+            text: 'SHIELD BROKE!',
+            particleCount: 14,
+          );
+        } else {
+          _spawnPopEffect(
+            Offset(bx, by),
+            const Color(0xFFEF4444),
+            text: '💥 POP!',
+            particleCount: 22,
+            isCrash: true,
+          );
           _triggerCrash();
           break;
         }
@@ -386,7 +479,8 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
   void _triggerCrash() {
     if (_hasReportedFinish) return;
     _hasReportedFinish = true;
-    final clearedDouble = _elapsedSeconds >= widget.doubleTargetSeconds;
+    final clearedDouble = _score >= widget.targetScore ||
+        _elapsedSeconds >= widget.doubleTargetSeconds;
     widget.onRunFinished(
       score: _score,
       bubbleCoinsEarned: _bubbleCoins,
@@ -411,8 +505,8 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
   @override
   Widget build(BuildContext context) {
     final bool isPastBoost = _elapsedSeconds >= widget.speedBoostAfterSeconds;
-    final bool isDouble = widget.playMode == BalloonPlayMode.doubleStake;
-    final bool targetCleared = _elapsedSeconds >= widget.doubleTargetSeconds;
+    final bool targetCleared =
+        _score >= widget.targetScore || _elapsedSeconds >= widget.doubleTargetSeconds;
     final String stakeMultLabel =
         GamesControlConfig.formatMultiplier(widget.doubleStakeMultiplier);
 
@@ -430,7 +524,9 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
             border: Border.all(
               color: isPastBoost && widget.phase == BalloonGamePhase.playing
                   ? const Color(0xFFEF4444)
-                  : const Color(0xFF0EA5E9).withValues(alpha: 0.65),
+                  : targetCleared && widget.phase == BalloonGamePhase.playing
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFF0EA5E9).withValues(alpha: 0.65),
               width: 2.2,
             ),
             boxShadow: [
@@ -442,225 +538,246 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onPanUpdate: (details) {
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerSignal: (event) {
                 if (widget.phase != BalloonGamePhase.playing) return;
-                setState(() {
-                  _balloonX =
-                      (_balloonX + details.delta.dx / _canvasSize.width)
-                          .clamp(0.07, 0.93);
-                  _balloonY =
-                      (_balloonY + details.delta.dy / _canvasSize.height)
-                          .clamp(0.16, 0.90);
-                });
+                if (event is PointerScrollEvent) {
+                  setState(() {
+                    // Manual mouse wheel / trackpad scroll steering
+                    if (event.scrollDelta.dx.abs() > 0.001) {
+                      _balloonX =
+                          (_balloonX + (event.scrollDelta.dx / _canvasSize.width) * 1.5)
+                              .clamp(0.07, 0.93);
+                    }
+                    if (event.scrollDelta.dy.abs() > 0.001) {
+                      _balloonX =
+                          (_balloonX + (event.scrollDelta.dy / _canvasSize.width) * 0.45)
+                              .clamp(0.07, 0.93);
+                    }
+                  });
+                  _checkCollisions();
+                }
               },
-              onTapDown: (details) {
-                if (widget.phase != BalloonGamePhase.playing) return;
-                setState(() {
-                  final targetX =
-                      (details.localPosition.dx / _canvasSize.width)
-                          .clamp(0.07, 0.93);
-                  final targetY =
-                      (details.localPosition.dy / _canvasSize.height)
-                          .clamp(0.16, 0.90);
-                  _balloonX = _balloonX + (targetX - _balloonX) * 0.45;
-                  _balloonY = _balloonY + (targetY - _balloonY) * 0.45;
-                });
-              },
-              child: Stack(
-                children: [
-                  // 1. Live Play Store Hot Air Balloon CustomPaint Canvas
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: _BalloonPlayfieldPainter(
-                        balloonX: _balloonX,
-                        balloonY: _balloonY,
-                        spikes: _spikes,
-                        bubbles: _bubbles,
-                        shieldActive: _shieldSeconds > 0,
-                        magnetActive: _magnetSeconds > 0,
-                        slowActive: _slowSeconds > 0,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onPanUpdate: (details) {
+                  if (widget.phase != BalloonGamePhase.playing) return;
+                  setState(() {
+                    _balloonX =
+                        (_balloonX + details.delta.dx / _canvasSize.width)
+                            .clamp(0.07, 0.93);
+                    _balloonY =
+                        (_balloonY + details.delta.dy / _canvasSize.height)
+                            .clamp(0.16, 0.90);
+                  });
+                  _checkCollisions();
+                },
+                onTapDown: (details) {
+                  if (widget.phase != BalloonGamePhase.playing) return;
+                  setState(() {
+                    final targetX =
+                        (details.localPosition.dx / _canvasSize.width)
+                            .clamp(0.07, 0.93);
+                    final targetY =
+                        (details.localPosition.dy / _canvasSize.height)
+                            .clamp(0.16, 0.90);
+                    _balloonX = _balloonX + (targetX - _balloonX) * 0.45;
+                    _balloonY = _balloonY + (targetY - _balloonY) * 0.45;
+                  });
+                  _checkCollisions();
+                },
+                child: Stack(
+                  children: [
+                    // 1. Live Play Store Hot Air Balloon CustomPaint Canvas
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _BalloonPlayfieldPainter(
+                          balloonX: _balloonX,
+                          balloonY: _balloonY,
+                          spikes: _spikes,
+                          bubbles: _bubbles,
+                          popEffects: _popEffects,
+                          shieldActive: _shieldSeconds > 0,
+                          magnetActive: _magnetSeconds > 0,
+                          slowActive: _slowSeconds > 0,
+                        ),
                       ),
                     ),
-                  ),
 
-                  // 2. Top-Left Crisp Retro Score Counter (`911 155` style from image)
-                  Positioned(
-                    top: 10,
-                    left: 12,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _formatSpacedScore(_score),
-                          style: const TextStyle(
-                            color: Color(0xFF1F2937),
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            fontFamily: 'monospace',
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        if (widget.bestScore > 0)
+                    // 2. Top-Left Crisp Retro Score Counter (`911 155` style from image)
+                    Positioned(
+                      top: 10,
+                      left: 12,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            'Best: ${_formatSpacedScore(widget.bestScore)}',
+                            _formatSpacedScore(_score),
                             style: const TextStyle(
-                              color: Color(0xFF6B7280),
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1F2937),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              fontFamily: 'monospace',
+                              letterSpacing: 0.5,
                             ),
                           ),
-                      ],
-                    ),
-                  ),
-
-                  // 3. Top-Center Speed, Time & Coin Popped Pill
-                  Positioned(
-                    top: 9,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 9,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF3F4F6).withValues(alpha: 0.95),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: isPastBoost
-                                ? const Color(0xFFEF4444)
-                                : const Color(0xFFD1D5DB),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
+                          if (widget.bestScore > 0)
                             Text(
-                              '${_elapsedSeconds.floor()}s',
+                              'Best: ${_formatSpacedScore(widget.bestScore)}',
                               style: const TextStyle(
-                                color: Color(0xFF111827),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF6B7280),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 5,
-                                vertical: 1,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isPastBoost
-                                    ? const Color(0xFFDC2626)
-                                    : _elapsedSeconds >= (widget.speedBoostAfterSeconds * 0.5)
-                                        ? const Color(0xFFF59E0B)
-                                        : const Color(0xFF0EA5E9),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                isPastBoost
-                                    ? '🔥 ${_speedMultiplier.toStringAsFixed(1)}x'
-                                    : '${_speedMultiplier.toStringAsFixed(1)}x',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w900,
+                        ],
+                      ),
+                    ),
+
+                    // 3. Top-Center Speed, Time & Coin Popped Pill with Target Progress
+                    Positioned(
+                      top: 9,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: targetCleared
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFFF3F4F6).withValues(alpha: 0.95),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: targetCleared
+                                  ? const Color(0xFF047857)
+                                  : isPastBoost
+                                      ? const Color(0xFFEF4444)
+                                      : const Color(0xFFD1D5DB),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${_elapsedSeconds.floor()}s',
+                                style: TextStyle(
+                                  color: targetCleared
+                                      ? Colors.white
+                                      : const Color(0xFF111827),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '+🪙 $_bubbleCoins',
-                              style: const TextStyle(
-                                color: Color(0xFFB45309),
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w800,
+                              const SizedBox(width: 5),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isPastBoost
+                                      ? const Color(0xFFDC2626)
+                                      : _elapsedSeconds >=
+                                              (widget.speedBoostAfterSeconds * 0.5)
+                                          ? const Color(0xFFF59E0B)
+                                          : const Color(0xFF0EA5E9),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  isPastBoost
+                                      ? '🔥 ${_speedMultiplier.toStringAsFixed(1)}x'
+                                      : '${_speedMultiplier.toStringAsFixed(1)}x',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 5),
+                              Text(
+                                '+🪙 $_bubbleCoins',
+                                style: TextStyle(
+                                  color: targetCleared
+                                      ? Colors.white
+                                      : const Color(0xFFB45309),
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
+                                  vertical: 1.5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: targetCleared
+                                      ? const Color(0xFF047857)
+                                      : Colors.black.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  targetCleared
+                                      ? '🏆 $stakeMultLabel WON!'
+                                      : '🎯 $_score/${widget.targetScore}',
+                                  style: TextStyle(
+                                    color: targetCleared
+                                        ? Colors.white
+                                        : const Color(0xFF1E293B),
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
 
-                  // 4. Top-Right Pause Icon (just like screenshot)
-                  Positioned(
-                    top: 8,
-                    right: 10,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (isDouble &&
-                            widget.phase == BalloonGamePhase.playing) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: targetCleared
-                                  ? const Color(0xFF10B981)
-                                  : const Color(0xFFFEF3C7),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: targetCleared
-                                    ? const Color(0xFF047857)
-                                    : const Color(0xFFF59E0B),
-                              ),
-                            ),
-                            child: Text(
-                              targetCleared
-                                  ? '✅ $stakeMultLabel Ready!'
-                                  : '$stakeMultLabel: ${_elapsedSeconds.floor()}/${widget.doubleTargetSeconds}s',
-                              style: TextStyle(
-                                color: targetCleared
-                                    ? Colors.white
-                                    : const Color(0xFF92400E),
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
+                    // 4. Top-Right Pause Icon
+                    Positioned(
+                      top: 8,
+                      right: 10,
+                      child: GestureDetector(
+                        onTap: widget.phase == BalloonGamePhase.playing ||
+                                widget.phase == BalloonGamePhase.paused
+                            ? widget.onTogglePauseTap
+                            : null,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF3F4F6),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          const SizedBox(width: 6),
-                        ],
-                        GestureDetector(
-                          onTap: widget.phase == BalloonGamePhase.playing ||
-                                  widget.phase == BalloonGamePhase.paused
-                              ? widget.onTogglePauseTap
-                              : null,
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF3F4F6),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              widget.phase == BalloonGamePhase.paused
-                                  ? Icons.play_arrow_rounded
-                                  : Icons.pause_rounded,
-                              color: const Color(0xFF1F2937),
-                              size: 18,
-                            ),
+                          child: Icon(
+                            widget.phase == BalloonGamePhase.paused
+                                ? Icons.play_arrow_rounded
+                                : Icons.pause_rounded,
+                            color: const Color(0xFF1F2937),
+                            size: 18,
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // 5. Ready / Paused / Game Over Overlay Card
-                  if (widget.phase != BalloonGamePhase.playing)
-                    Positioned.fill(
-                      child: Container(
-                        color: Colors.white.withValues(alpha: 0.72),
-                        child: Center(
-                          child: _buildStatusCard(context),
                         ),
                       ),
                     ),
-                ],
+
+                    // 5. Ready / Paused / Game Over Overlay Card
+                    if (widget.phase != BalloonGamePhase.playing)
+                      Positioned.fill(
+                        child: Container(
+                          color: Colors.white.withValues(alpha: 0.72),
+                          child: Center(
+                            child: _buildStatusCard(context),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -670,11 +787,10 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
   }
 
   Widget _buildStatusCard(BuildContext context) {
-    final isDouble = widget.playMode == BalloonPlayMode.doubleStake;
     final summary = widget.lastRunSummary;
 
     return Container(
-      width: 285,
+      width: 290,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFF0F172A),
@@ -731,7 +847,7 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
             ),
             const SizedBox(height: 8),
             Text(
-              'Score: ${_formatSpacedScore(summary.score)}  •  Time: ${summary.survivedSeconds.toStringAsFixed(1)}s',
+              'Score: ${_formatSpacedScore(summary.score)} / ${widget.targetScore} pts  •  Time: ${summary.survivedSeconds.toStringAsFixed(1)}s',
               style: const TextStyle(color: Colors.white70, fontSize: 11.5),
             ),
             const SizedBox(height: 6),
@@ -751,13 +867,14 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
               child: Text(
                 summary.earnedCoins > 0
                     ? '🪙 Earned: +${summary.earnedCoins} Coins'
-                    : '🪙 Lost Stake: -${summary.stakedCoins} Coins',
+                    : '🪙 Target (${widget.targetScore} pts) Not Reached\nLost Stake: -${summary.stakedCoins} Coins',
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   color: summary.earnedCoins > 0
                       ? const Color(0xFF6EE7B7)
                       : const Color(0xFFFCA5A5),
                   fontWeight: FontWeight.w900,
-                  fontSize: 12.5,
+                  fontSize: 12.0,
                 ),
               ),
             ),
@@ -775,9 +892,9 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
                 ),
                 onPressed: widget.onStartTap,
                 icon: const Icon(Icons.replay_rounded, size: 18),
-                label: Text(
-                  isDouble ? 'STAKE & FLY AGAIN' : 'PLAY AGAIN',
-                  style: const TextStyle(fontWeight: FontWeight.w900),
+                label: const Text(
+                  'INVEST & FLY AGAIN',
+                  style: TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
             ),
@@ -792,9 +909,7 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
             ),
             const SizedBox(height: 6),
             Text(
-              isDouble
-                  ? 'Faster speed challenge! Survive ${widget.doubleTargetSeconds}s+ to win ${GamesControlConfig.formatMultiplier(widget.doubleStakeMultiplier)} your staked coins. Speed surges >${widget.speedBoostAfterSeconds}s!'
-                  : 'Drag balloon to dodge black spikes & pop bubbles (+${widget.standardBubbleCoins}/+${widget.goldBubbleCoins} coins)! Speed boosts high after ${widget.speedBoostAfterSeconds}s.',
+              'Manual steering & scrolling! Reach minimum ${widget.targetScore} pts target to win ${GamesControlConfig.formatMultiplier(widget.doubleStakeMultiplier)} payout! Collect falling bubbles & avoid spikes.',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white70,
@@ -807,10 +922,8 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
               width: double.infinity,
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isDouble
-                      ? AppColors.goldCoin
-                      : const Color(0xFF0EA5E9),
-                  foregroundColor: isDouble ? Colors.black : Colors.white,
+                  backgroundColor: AppColors.goldCoin,
+                  foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -819,9 +932,7 @@ class _BalloonGameCanvasState extends State<BalloonGameCanvas>
                 onPressed: widget.onStartTap,
                 icon: const Icon(Icons.flight_takeoff_rounded, size: 18),
                 label: Text(
-                  isDouble
-                      ? 'STAKE & START ${GamesControlConfig.formatMultiplier(widget.doubleStakeMultiplier)} RUN'
-                      : 'START FLIGHT (FREE)',
+                  'INVEST & START (${GamesControlConfig.formatMultiplier(widget.doubleStakeMultiplier)} WIN)',
                   style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
@@ -841,6 +952,7 @@ class _BalloonPlayfieldPainter extends CustomPainter {
   final double balloonY;
   final List<BalloonSpikeBar> spikes;
   final List<BalloonBubble> bubbles;
+  final List<BalloonPopEffect> popEffects;
   final bool shieldActive;
   final bool magnetActive;
   final bool slowActive;
@@ -850,6 +962,7 @@ class _BalloonPlayfieldPainter extends CustomPainter {
     required this.balloonY,
     required this.spikes,
     required this.bubbles,
+    required this.popEffects,
     required this.shieldActive,
     required this.magnetActive,
     required this.slowActive,
@@ -903,6 +1016,62 @@ class _BalloonPlayfieldPainter extends CustomPainter {
       );
     }
     _drawHotAirBalloon(canvas, bCenter);
+
+    // 5. Popping Particles, Burst Rings & Floating Text Scores
+    for (final e in popEffects) {
+      _drawPopEffect(canvas, e);
+    }
+  }
+
+  void _drawPopEffect(Canvas canvas, BalloonPopEffect effect) {
+    final double p = effect.progress;
+    final double alpha = (1.0 - p).clamp(0.0, 1.0);
+    if (alpha <= 0.0) return;
+
+    // Expanding shockwave ring
+    final ringRadius = (effect.isCrash ? 36.0 : 18.0) * (0.3 + 0.7 * p);
+    canvas.drawCircle(
+      effect.position,
+      ringRadius,
+      Paint()
+        ..color = effect.color.withValues(alpha: alpha * 0.55)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = effect.isCrash ? 2.5 : 1.5,
+    );
+
+    // Radiating burst particles
+    for (int i = 0; i < effect.particleVelocities.length; i++) {
+      final v = effect.particleVelocities[i];
+      final pos = effect.position + (v * p);
+      final c = effect.particleColors[i];
+      final partRadius = (effect.isCrash ? 4.5 : 3.0) * (1.0 - p * 0.45);
+      canvas.drawCircle(
+        pos,
+        partRadius,
+        Paint()..color = c.withValues(alpha: alpha),
+      );
+    }
+
+    // Floating text indicator (+10, +50, 💥 POP!, etc.)
+    if (effect.text != null && effect.text!.isNotEmpty) {
+      final tp = TextPainter(
+        text: TextSpan(
+          text: effect.text,
+          style: TextStyle(
+            color: effect.color.withValues(alpha: alpha),
+            fontSize: effect.isCrash ? 16 : 13,
+            fontWeight: FontWeight.w900,
+            fontFamily: 'monospace',
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final textOffset = Offset(
+        effect.position.dx - tp.width / 2,
+        effect.position.dy - 14 - (p * 28.0),
+      );
+      tp.paint(canvas, textOffset);
+    }
   }
 
   void _drawStandardBubble(Canvas canvas, Offset center, double r) {

@@ -89,6 +89,7 @@ const DEFAULT_CONFIG: {
       roundSeconds: 40,
       betLockSeconds: 40,
       multipliers: {
+        targetScore: 1000,
         standardBubbleCoins: 10,
         goldBubbleCoins: 50,
         distanceBonusPer4s: 5,

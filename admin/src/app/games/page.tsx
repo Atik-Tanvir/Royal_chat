@@ -97,6 +97,7 @@ const GAME_UI_META: Record<string, GameUiMeta> = {
     houseProfitToday: 61500,
     activePlayers: 276,
     fields: [
+      { key: 'targetScore', label: 'Minimum Target Score to Win', unit: 'pts', accent: 'text-yellow-300', step: 100, min: 200 },
       { key: 'standardBubbleCoins', label: 'White Bubble Coin', unit: 'coins', accent: 'text-sky-300', step: 5, min: 1 },
       { key: 'goldBubbleCoins', label: 'Gold Bubble Coin', unit: 'coins', accent: 'text-amber-300', step: 10, min: 5 },
       { key: 'distanceBonusPer4s', label: 'Distance Bonus / 4s', unit: 'coins', accent: 'text-emerald-300', step: 1, min: 1 },
@@ -155,6 +156,7 @@ const DEFAULT_GAMES: GameControlConfig[] = [
     roundSeconds: 40,
     betLockSeconds: 40,
     multipliers: {
+      targetScore: 1000,
       standardBubbleCoins: 10,
       goldBubbleCoins: 50,
       distanceBonusPer4s: 5,

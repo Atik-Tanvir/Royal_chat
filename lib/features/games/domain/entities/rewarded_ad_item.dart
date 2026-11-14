@@ -61,6 +61,9 @@ class RewardedAdsConfig extends Equatable {
     this.activeAds = const [],
   });
 
+  int get rewardCoins =>
+      activeAds.isNotEmpty ? activeAds.first.rewardCoins : 300;
+
   @override
   List<Object?> get props => [adsEnabled, activeAds];
 }

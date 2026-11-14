@@ -151,7 +151,6 @@ class BalloonGameBloc extends Bloc<BalloonGameEvent, BalloonGameState> {
       return;
     }
 
-    final isDouble = state.playMode == BalloonPlayMode.doubleStake;
     int runStake = 0;
 
     final uid = AuthSessionManager.currentUserId;
@@ -164,36 +163,40 @@ class BalloonGameBloc extends Bloc<BalloonGameEvent, BalloonGameState> {
     double nextGuest = state.guestFallbackBalance;
     int nextSyncTick = state.profileBalanceSyncTick;
 
-    if (isDouble) {
-      final minBet = latestConfig.minBetFor(_gameId);
-      final maxBet = latestConfig.maxBetFor(_gameId);
-      if (state.stakeInputAmount <= 0 ||
-          state.stakeInputAmount < minBet ||
-          state.stakeInputAmount > maxBet) {
-        emit(state.copyWith(
-          gamesConfig: latestConfig,
-          uiFeedbackMessage:
-              'Stake must be between $minBet and $maxBet coins (Admin limit).',
-          uiFeedbackNeedsAdRefill: false,
-          uiFeedbackTick: state.uiFeedbackTick + 1,
-        ));
-        return;
-      }
+    final minBet = latestConfig.minBetFor(_gameId);
+    final maxBet = latestConfig.maxBetFor(_gameId);
+    if (state.stakeInputAmount <= 0 ||
+        state.stakeInputAmount < minBet ||
+        state.stakeInputAmount > maxBet) {
+      emit(state.copyWith(
+        gamesConfig: latestConfig,
+        uiFeedbackMessage:
+            'Please invest between $minBet and $maxBet coins to fly.',
+        uiFeedbackNeedsAdRefill: false,
+        uiFeedbackTick: state.uiFeedbackTick + 1,
+      ));
+      return;
+    }
 
-      if (currentBalance <= 0 || currentBalance < state.stakeInputAmount) {
-        emit(state.copyWith(gamesConfig: latestConfig));
-        add(const FetchBalloonRewardedAdsEvent(openDialogAfterFetch: true));
-        return;
-      }
+    if (currentBalance <= 0 || currentBalance < state.stakeInputAmount) {
+      emit(state.copyWith(
+        gamesConfig: latestConfig,
+        uiFeedbackMessage:
+            'Need more coins! Watch a quick video ad to get free coins.',
+        uiFeedbackNeedsAdRefill: true,
+        uiFeedbackTick: state.uiFeedbackTick + 1,
+      ));
+      add(const FetchBalloonRewardedAdsEvent(openDialogAfterFetch: true));
+      return;
+    }
 
-      runStake = state.stakeInputAmount;
-      final deducted = currentBalance - runStake;
-      if (isGuest) {
-        nextGuest = deducted;
-      } else {
-        nextSynced = deducted;
-        nextSyncTick++;
-      }
+    runStake = state.stakeInputAmount;
+    final deducted = currentBalance - runStake;
+    if (isGuest) {
+      nextGuest = deducted;
+    } else {
+      nextSynced = deducted;
+      nextSyncTick++;
     }
 
     emit(state.copyWith(
@@ -236,7 +239,9 @@ class BalloonGameBloc extends Bloc<BalloonGameEvent, BalloonGameState> {
     }
 
     final int stake = state.activeRunStake;
-    final bool wonDouble = stake > 0 && event.doubleTargetCleared;
+    final int target = state.targetScore;
+    final bool wonDouble = stake > 0 &&
+        (event.doubleTargetCleared || event.score >= target);
 
     // Survival coin bonus & stake payout controlled by Admin Games Control
     final int distanceBonusCoins =
@@ -265,6 +270,7 @@ class BalloonGameBloc extends Bloc<BalloonGameEvent, BalloonGameState> {
 
     final summary = BalloonRunSummary(
       score: event.score,
+      targetScore: target,
       earnedCoins: totalEarned,
       stakedCoins: stake,
       doubleWon: wonDouble,
@@ -274,15 +280,14 @@ class BalloonGameBloc extends Bloc<BalloonGameEvent, BalloonGameState> {
     final int nextBest = max(state.bestScore, event.score);
     final double finalBalance = isGuest ? nextGuest : nextSynced;
 
-    final int targetSec = state.doubleTargetSeconds;
     String? toast;
     if (wonDouble) {
       toast =
-          '🎉 $stakeMultLabel Win! +$totalEarned Coins added (${event.survivedSeconds.toStringAsFixed(0)}s)!';
+          '🎉 TARGET REACHED ($target pts)! Won $stakeMultLabel (+$totalEarned Coins)!';
     } else if (stake > 0 && !wonDouble) {
       toast = totalEarned > 0
-          ? '💥 Crashed before ${targetSec}s! Earned +$totalEarned bubble coins.'
-          : '💥 Balloon popped! Reach ${targetSec}s next run to win $stakeMultLabel!';
+          ? '💥 Crashed before reaching $target pts! Earned +$totalEarned balloon coins.'
+          : '💥 Crashed! Reach $target pts next run to win $stakeMultLabel!';
     } else if (totalEarned > 0) {
       toast = '🎈 Nice flight! Earned +$totalEarned Coins!';
     }

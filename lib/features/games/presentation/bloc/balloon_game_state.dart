@@ -44,6 +44,12 @@ class BalloonGameState extends Equatable {
     this.openWatchAdModalTick = 0,
   });
 
+  int get targetScore => gamesConfig.intParamFor(
+        'game_balloon_sky',
+        'targetScore',
+        fallback: 1000,
+      );
+
   int get doubleTargetSeconds => gamesConfig.intParamFor(
         'game_balloon_sky',
         'doubleTargetSeconds',

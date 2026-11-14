@@ -167,6 +167,7 @@ class GamesControlConfig extends Equatable {
           'standardBubbleCoins': 10.0,
           'goldBubbleCoins': 50.0,
           'distanceBonusPer4s': 5.0,
+          'targetScore': 1000.0,
           'doubleTargetSeconds': 40.0,
           'doubleStakeMultiplier': 2.0,
           'speedBoostAfterSeconds': 40.0,

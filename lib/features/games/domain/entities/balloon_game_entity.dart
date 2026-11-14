@@ -25,13 +25,15 @@ enum BalloonPowerUpType {
 class BalloonSpikeBar {
   double xNorm; // Left X normalized (0.0 .. 1.0)
   double yNorm; // Top Y normalized (0.0 .. 1.0+)
+  double prevYNorm; // Previous frame Y to prevent high-speed tunneling
   final double widthNorm; // Bar width fraction of canvas width (e.g. 0.16 .. 0.50)
 
   BalloonSpikeBar({
     required this.xNorm,
     required this.yNorm,
+    double? prevYNorm,
     required this.widthNorm,
-  });
+  }) : prevYNorm = prevYNorm ?? yNorm;
 }
 
 /// Collectible floating bubble (standard, gold coin, or power-up ring).
@@ -54,6 +56,7 @@ class BalloonBubble {
 /// Result summary emitted when a flight ends.
 class BalloonRunSummary extends Equatable {
   final int score;
+  final int targetScore;
   final int earnedCoins;
   final int stakedCoins;
   final bool doubleWon;
@@ -61,6 +64,7 @@ class BalloonRunSummary extends Equatable {
 
   const BalloonRunSummary({
     required this.score,
+    this.targetScore = 1000,
     required this.earnedCoins,
     required this.stakedCoins,
     required this.doubleWon,
@@ -70,6 +74,7 @@ class BalloonRunSummary extends Equatable {
   @override
   List<Object?> get props => [
         score,
+        targetScore,
         earnedCoins,
         stakedCoins,
         doubleWon,
