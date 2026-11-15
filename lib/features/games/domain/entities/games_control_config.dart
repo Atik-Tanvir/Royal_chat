@@ -27,8 +27,14 @@ class GameControlItemConfig extends Equatable {
 
   double multiplierFor(String outcomeKey, {double fallback = 2.0}) {
     final val = multipliers[outcomeKey];
-    if (val == null || val <= 0) return fallback;
-    return val;
+    if (val != null && val > 0) return val;
+    // Backward-compatibility aliases for legacy keys
+    if (outcomeKey == 'apple') return multipliers['bucket'] ?? fallback;
+    if (outcomeKey == 'watermelon') return multipliers['mug'] ?? fallback;
+    if (outcomeKey == 'bell') return multipliers['flower'] ?? fallback;
+    if (outcomeKey == 'lucky7') return multipliers['star'] ?? fallback;
+    if (outcomeKey == 'rocket') return multipliers['gift'] ?? fallback;
+    return fallback;
   }
 
   int intParamFor(String key, {required int fallback}) {
@@ -111,13 +117,13 @@ class GamesControlConfig extends Equatable {
         roundSeconds: 35,
         betLockSeconds: 30,
         multipliers: {
-          'bucket': 2.0,
-          'mug': 2.0,
-          'flower': 2.0,
-          'star': 2.0,
+          'apple': 2.0,
+          'watermelon': 2.0,
+          'bell': 2.0,
+          'lucky7': 2.0,
           'diamond': 2.0,
           'crown': 2.0,
-          'gift': 2.0,
+          'rocket': 2.0,
           'heart': 2.0,
         },
       ),

@@ -60,11 +60,11 @@ class BucketGameBloc extends Bloc<BucketGameEvent, BucketGameState> {
     final roomName = event.partyRoomName ?? 'Royal Group #1';
 
     final initialHistory = [
-      kBucketGameItems[5], // Crown
-      kBucketGameItems[4], // Diamond
-      kBucketGameItems[0], // Bucket
-      kBucketGameItems[6], // Gift
-      kBucketGameItems[2], // Flower
+      kBucketGameItems[5], // Crown 👑
+      kBucketGameItems[4], // Diamond 💎
+      kBucketGameItems[0], // Apple 🍎
+      kBucketGameItems[3], // Lucky 7 7️⃣
+      kBucketGameItems[1], // Watermelon 🍉
     ];
 
     emit(state.copyWith(

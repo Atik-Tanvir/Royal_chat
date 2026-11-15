@@ -21,42 +21,42 @@ class BucketGameItem extends Equatable {
   List<Object?> get props => [id, nameBn, nameEn, icon, accentColor];
 }
 
-/// The exact 8 items from RoyaleChat / Gemgala 8-Item Bucket Prediction (`game.game.html`)
+/// The 8 mixed all-star prediction items (Fruit Slot + Casino Arcade + Royal Luxury + Live Party Gifts)
 const List<BucketGameItem> kBucketGameItems = [
   BucketGameItem(
-    id: 'bucket',
-    nameBn: 'বালতি',
-    nameEn: 'Bucket',
-    icon: '🪣',
-    accentColor: Color(0xFF00E5FF),
+    id: 'apple',
+    nameBn: 'আপেল',
+    nameEn: 'Apple',
+    icon: '🍎',
+    accentColor: Color(0xFFEF4444),
   ),
   BucketGameItem(
-    id: 'mug',
-    nameBn: 'মগ',
-    nameEn: 'Mug',
-    icon: '🥛',
-    accentColor: Color(0xFF38BDF8),
+    id: 'watermelon',
+    nameBn: 'তরমুজ',
+    nameEn: 'Watermelon',
+    icon: '🍉',
+    accentColor: Color(0xFF10B981),
   ),
   BucketGameItem(
-    id: 'flower',
-    nameBn: 'ফুল',
-    nameEn: 'Flower',
-    icon: '🌸',
-    accentColor: Color(0xFFF472B6),
-  ),
-  BucketGameItem(
-    id: 'star',
-    nameBn: 'তারা',
-    nameEn: 'Star',
-    icon: '⭐',
+    id: 'bell',
+    nameBn: 'ঘণ্টা',
+    nameEn: 'Bell',
+    icon: '🔔',
     accentColor: Color(0xFFFACC15),
+  ),
+  BucketGameItem(
+    id: 'lucky7',
+    nameBn: 'লাকি ৭',
+    nameEn: 'Lucky 7',
+    icon: '7️⃣',
+    accentColor: Color(0xFFFF5722),
   ),
   BucketGameItem(
     id: 'diamond',
     nameBn: 'ডায়মন্ড',
     nameEn: 'Diamond',
     icon: '💎',
-    accentColor: Color(0xFF60A5FA),
+    accentColor: Color(0xFF00E5FF),
   ),
   BucketGameItem(
     id: 'crown',
@@ -66,18 +66,18 @@ const List<BucketGameItem> kBucketGameItems = [
     accentColor: Color(0xFFFFB703),
   ),
   BucketGameItem(
-    id: 'gift',
-    nameBn: 'উপহার',
-    nameEn: 'Gift',
-    icon: '🎁',
-    accentColor: Color(0xFFFF4D6D),
+    id: 'rocket',
+    nameBn: 'রকেট',
+    nameEn: 'Rocket',
+    icon: '🚀',
+    accentColor: Color(0xFF8B5CF6),
   ),
   BucketGameItem(
     id: 'heart',
     nameBn: 'হার্ট',
     nameEn: 'Heart',
     icon: '❤️',
-    accentColor: Color(0xFFEF4444),
+    accentColor: Color(0xFFEC4899),
   ),
 ];
 
