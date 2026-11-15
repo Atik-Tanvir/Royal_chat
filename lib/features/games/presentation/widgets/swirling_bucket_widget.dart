@@ -32,6 +32,7 @@ class SwirlingBucketWidget extends StatefulWidget {
   final BucketRevealBadge? revealBadge;
   final BucketVisualTheme theme;
   final double size;
+  final List<BucketGameItem>? items;
 
   const SwirlingBucketWidget({
     super.key,
@@ -40,11 +41,47 @@ class SwirlingBucketWidget extends StatefulWidget {
     this.revealBadge,
     this.theme = BucketVisualTheme.aquaGold,
     this.size = 152,
+    this.items,
   });
 
   @override
   State<SwirlingBucketWidget> createState() => _SwirlingBucketWidgetState();
 }
+
+class _TricolorCycleItem {
+  final String label;
+  final String icon;
+  final Color color;
+  final List<Color> swatch;
+
+  const _TricolorCycleItem({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.swatch,
+  });
+}
+
+const List<_TricolorCycleItem> _kTricolorCycleItems = [
+  _TricolorCycleItem(
+    label: 'Red',
+    icon: '🔴',
+    color: Color(0xFFFF2E54),
+    swatch: [Color(0xFFFF2E54), Color(0xFFBE123C)],
+  ),
+  _TricolorCycleItem(
+    label: 'Violet',
+    icon: '🟣',
+    color: Color(0xFF9333EA),
+    swatch: [Color(0xFFC084FC), Color(0xFF7E22CE)],
+  ),
+  _TricolorCycleItem(
+    label: 'Green',
+    icon: '🟢',
+    color: Color(0xFF10B981),
+    swatch: [Color(0xFF34D399), Color(0xFF047857)],
+  ),
+];
 
 class _SwirlingBucketWidgetState extends State<SwirlingBucketWidget>
     with TickerProviderStateMixin {
@@ -52,13 +89,15 @@ class _SwirlingBucketWidgetState extends State<SwirlingBucketWidget>
   late AnimationController _colorShiftController;
   late AnimationController _pulseController;
   late AnimationController _revealController;
+  late AnimationController _cycleController;
+  late AnimationController _floatController;
 
   @override
   void initState() {
     super.initState();
     _spinController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2400),
+      duration: Duration(milliseconds: widget.isUrgentSpin ? 650 : 2400),
     )..repeat();
 
     _colorShiftController = AnimationController(
@@ -73,8 +112,22 @@ class _SwirlingBucketWidgetState extends State<SwirlingBucketWidget>
 
     _revealController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 700),
+      duration: const Duration(milliseconds: 900),
     );
+
+    _cycleController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: widget.isUrgentSpin ? 750 : 3200),
+    )..repeat();
+
+    _floatController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat(reverse: true);
+
+    if (widget.revealedItem != null || widget.revealBadge != null) {
+      _revealController.value = 1.0;
+    }
   }
 
   BucketRevealBadge? get _effectiveBadge {
@@ -100,6 +153,13 @@ class _SwirlingBucketWidgetState extends State<SwirlingBucketWidget>
       if (_spinController.isAnimating) {
         _spinController.repeat();
       }
+
+      _cycleController.duration = Duration(
+        milliseconds: widget.isUrgentSpin ? 750 : 3200,
+      );
+      if (_cycleController.isAnimating) {
+        _cycleController.repeat();
+      }
     }
 
     final hasNewReveal =
@@ -120,6 +180,8 @@ class _SwirlingBucketWidgetState extends State<SwirlingBucketWidget>
     _colorShiftController.dispose();
     _pulseController.dispose();
     _revealController.dispose();
+    _cycleController.dispose();
+    _floatController.dispose();
     super.dispose();
   }
 
@@ -134,6 +196,7 @@ class _SwirlingBucketWidgetState extends State<SwirlingBucketWidget>
       width: outerSize + 28,
       height: outerSize + 12,
       child: Stack(
+        clipBehavior: Clip.none,
         alignment: Alignment.center,
         children: [
           // Bucket Metallic Side Ears / Handles
@@ -294,171 +357,403 @@ class _SwirlingBucketWidgetState extends State<SwirlingBucketWidget>
             ),
           ),
 
-          // Center Content: Floating ❓ OR Rising Winning Item/Color with Name
+          // Center Content: Dynamic Cycling Items OR Rising Winning Item/Color
           if (badge == null)
-            AnimatedBuilder(
-              animation: _pulseController,
-              builder: (context, child) {
-                final scale = 0.94 + (_pulseController.value * 0.14);
-                final dy = sin(_pulseController.value * pi) * -3.5;
-                return Transform.translate(
-                  offset: Offset(0, dy),
-                  child: Transform.scale(
-                    scale: scale,
-                    child: child,
+            _buildCyclingCenterItem(
+              outerSize: outerSize,
+              isTricolor: isTricolor,
+            )
+          else
+            _buildRisingWinner(badge, outerSize),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCyclingCenterItem({
+    required double outerSize,
+    required bool isTricolor,
+  }) {
+    final portalSize = outerSize < 135 ? 56.0 : 64.0;
+    final isUrgent = widget.isUrgentSpin;
+
+    if (isTricolor) {
+      final itemCount = _kTricolorCycleItems.length;
+      return AnimatedBuilder(
+        animation: Listenable.merge([_cycleController, _pulseController]),
+        builder: (context, _) {
+          final totalVal = _cycleController.value * itemCount;
+          final idx = totalVal.floor() % itemCount;
+          final item = _kTricolorCycleItems[idx];
+          final pulseScale = 0.96 + (_pulseController.value * 0.08);
+
+          return Transform.scale(
+            scale: pulseScale,
+            child: Container(
+              width: portalSize,
+              height: portalSize,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFF20092F),
+                    item.color.withValues(alpha: 0.35),
+                    const Color(0xFF100318),
+                  ],
+                  stops: const [0.2, 0.7, 1.0],
+                ),
+                border: Border.all(
+                  color: item.color.withValues(alpha: 0.9),
+                  width: 2.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: item.color.withValues(alpha: isUrgent ? 0.75 : 0.45),
+                    blurRadius: isUrgent ? 16 : 12,
+                    spreadRadius: isUrgent ? 3 : 1,
                   ),
-                );
-              },
-              child: Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isTricolor
-                      ? const Color(0xFF1F062A).withValues(alpha: 0.78)
-                      : const Color(0xFF041C32).withValues(alpha: 0.72),
-                  border: Border.all(
-                    color: isTricolor
-                        ? const Color(0xFFE879F9)
-                        : const Color(0xFF38BDF8),
-                    width: 2.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: (isTricolor
-                              ? const Color(0xFFD946EF)
-                              : const Color(0xFF0EA5E9))
-                          .withValues(alpha: 0.45),
-                      blurRadius: 12,
+                ],
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: item.swatch,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: item.color.withValues(alpha: 0.6),
+                            blurRadius: 6,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: item.color.withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        item.label.toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 7.5,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                child: Center(
-                  child: Text(
-                    '?',
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    // 8-item prediction cycle: Apple, Watermelon, Bell, Lucky 7, Diamond, Crown, Rocket, Heart
+    final items = widget.items != null && widget.items!.isNotEmpty
+        ? widget.items!
+        : kBucketGameItems;
+    final itemCount = items.length;
+
+    return AnimatedBuilder(
+      animation: Listenable.merge([_cycleController, _pulseController]),
+      builder: (context, _) {
+        final totalVal = _cycleController.value * itemCount;
+        final idx = totalVal.floor() % itemCount;
+        final item = items[idx];
+        final pulseScale = 0.95 + (_pulseController.value * 0.08);
+
+        return Transform.scale(
+          scale: pulseScale,
+          child: Container(
+            width: portalSize,
+            height: portalSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  const Color(0xFF041C32),
+                  item.accentColor.withValues(alpha: 0.32),
+                  const Color(0xFF020B14),
+                ],
+                stops: const [0.2, 0.72, 1.0],
+              ),
+              border: Border.all(
+                color: item.accentColor.withValues(alpha: 0.92),
+                width: 2.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: item.accentColor.withValues(alpha: isUrgent ? 0.75 : 0.45),
+                  blurRadius: isUrgent ? 16 : 12,
+                  spreadRadius: isUrgent ? 3 : 1,
+                ),
+              ],
+            ),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    item.icon,
                     style: TextStyle(
-                      color: isTricolor
-                          ? const Color(0xFFFDF4FF)
-                          : const Color(0xFFFFFBEB),
-                      fontSize: 34,
-                      fontWeight: FontWeight.w900,
-                      shadows: const [
-                        Shadow(color: Colors.black, blurRadius: 8),
+                      fontSize: outerSize < 135 ? 23 : 26,
+                      shadows: [
+                        Shadow(
+                          color: item.accentColor.withValues(alpha: 0.7),
+                          blurRadius: 8,
+                        ),
+                        const Shadow(color: Colors.black, blurRadius: 6),
                       ],
                     ),
                   ),
-                ),
-              ),
-            )
-          else
-            AnimatedBuilder(
-              animation: _revealController,
-              builder: (context, _) {
-                final t = Curves.easeOutBack.transform(
-                  _revealController.value.clamp(0.0, 1.0),
-                );
-                final scale = 0.3 + (0.75 * t);
-                final liftY = (1.0 - t) * 28.0 - 4.0;
-
-                return Transform.translate(
-                  offset: Offset(0, liftY),
-                  child: Transform.scale(
-                    scale: scale,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFF1E1038).withValues(alpha: 0.96),
-                            badge.accentColor.withValues(alpha: 0.45),
-                          ],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
+                  const SizedBox(height: 2),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: item.accentColor.withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(6),
+                      boxShadow: [
+                        BoxShadow(
+                          color: item.accentColor.withValues(alpha: 0.5),
+                          blurRadius: 4,
                         ),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: const Color(0xFFFFD700),
-                          width: 2.2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: badge.accentColor.withValues(alpha: 0.75),
-                            blurRadius: 20,
-                            spreadRadius: 3,
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (badge.colorSwatch != null &&
-                              badge.colorSwatch!.length >= 2)
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: LinearGradient(
-                                  colors: badge.colorSwatch!,
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                border: Border.all(color: Colors.white, width: 2.5),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: badge.accentColor.withValues(alpha: 0.8),
-                                    blurRadius: 14,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
-                              ),
-                            )
-                          else if (badge.icon != null)
-                            Text(
-                              badge.icon!,
-                              style: const TextStyle(
-                                fontSize: 38,
-                                shadows: [
-                                  Shadow(color: Colors.black54, blurRadius: 8),
-                                ],
-                              ),
-                            ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: badge.colorSwatch != null
-                                  ? badge.accentColor
-                                  : const Color(0xFFFFD700),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              badge.label,
-                              style: TextStyle(
-                                color: badge.colorSwatch != null
-                                    ? Colors.white
-                                    : Colors.black,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 13,
-                                letterSpacing: badge.colorSwatch != null ? 1.0 : 0.0,
-                              ),
-                            ),
-                          ),
-                        ],
+                      ],
+                    ),
+                    child: Text(
+                      item.nameEn.toUpperCase(),
+                      maxLines: 1,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 7.2,
+                        letterSpacing: 0.4,
                       ),
                     ),
                   ),
-                );
-              },
+                ],
+              ),
             ),
-        ],
-      ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildRisingWinner(BucketRevealBadge badge, double outerSize) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_revealController, _floatController]),
+      builder: (context, _) {
+        final revealProgress = _revealController.value;
+        final t = Curves.easeOutBack.transform(revealProgress.clamp(0.0, 1.0));
+
+        // Emerges from deep inside the swirling water (+36.0px) up to floating above the rim (-36.0px)
+        final hoverDy = revealProgress >= 0.95
+            ? sin(_floatController.value * 2 * pi) * 3.5
+            : 0.0;
+        final liftY = (1.0 - t) * 38.0 - (t * 36.0) + hoverDy;
+        final scale = 0.25 + (0.80 * t);
+        final opacity = (revealProgress * 2.5).clamp(0.0, 1.0);
+
+        return Transform.translate(
+          offset: Offset(0, liftY),
+          child: Transform.scale(
+            scale: scale,
+            child: Opacity(
+              opacity: opacity,
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  // Floating celebration sparkles emerging on sides
+                  Positioned(
+                    top: -10,
+                    left: -12,
+                    child: Opacity(
+                      opacity: (revealProgress * 1.5).clamp(0.0, 1.0),
+                      child: const Text('✨', style: TextStyle(fontSize: 14)),
+                    ),
+                  ),
+                  Positioned(
+                    top: -8,
+                    right: -12,
+                    child: Opacity(
+                      opacity: (revealProgress * 1.5).clamp(0.0, 1.0),
+                      child: const Text('🌟', style: TextStyle(fontSize: 14)),
+                    ),
+                  ),
+
+                  // Winning Card Container
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF130924).withValues(alpha: 0.96),
+                          badge.accentColor.withValues(alpha: 0.55),
+                          const Color(0xFF0D0517).withValues(alpha: 0.96),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFFFFD700),
+                        width: 2.4,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: badge.accentColor.withValues(alpha: 0.85),
+                          blurRadius: 24,
+                          spreadRadius: 3,
+                        ),
+                        BoxShadow(
+                          color: const Color(0xFFFFD700).withValues(alpha: 0.45),
+                          blurRadius: 14,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Golden Winner Tag
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 1.5,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFFFFE082),
+                                Color(0xFFFFB300),
+                                Color(0xFFFF8F00),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFF8F00).withValues(alpha: 0.6),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('👑 ', style: TextStyle(fontSize: 9)),
+                              Text(
+                                'WINNER',
+                                style: TextStyle(
+                                  color: Color(0xFF261202),
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 9,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        if (badge.colorSwatch != null &&
+                            badge.colorSwatch!.length >= 2)
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: badge.colorSwatch!,
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              border: Border.all(color: Colors.white, width: 2.5),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: badge.accentColor.withValues(alpha: 0.8),
+                                  blurRadius: 14,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                          )
+                        else if (badge.icon != null)
+                          Text(
+                            badge.icon!,
+                            style: const TextStyle(
+                              fontSize: 38,
+                              shadows: [
+                                Shadow(color: Colors.black87, blurRadius: 8),
+                              ],
+                            ),
+                          ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: badge.colorSwatch != null
+                                ? badge.accentColor
+                                : const Color(0xFFFFD700),
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (badge.colorSwatch != null
+                                        ? badge.accentColor
+                                        : const Color(0xFFFFD700))
+                                    .withValues(alpha: 0.6),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            badge.label,
+                            style: TextStyle(
+                              color: badge.colorSwatch != null
+                                  ? Colors.white
+                                  : Colors.black,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 12.5,
+                              letterSpacing: badge.colorSwatch != null ? 1.0 : 0.0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

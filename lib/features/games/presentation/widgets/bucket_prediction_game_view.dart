@@ -266,7 +266,7 @@ class _BucketGameViewContentState extends State<_BucketGameViewContent> {
 
   Widget _buildCenterBucketSection(BucketGameState state, bool isUrgent) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+      padding: const EdgeInsets.fromLTRB(12, 24, 12, 8),
       child: Column(
         children: [
           SwirlingBucketWidget(
@@ -274,6 +274,7 @@ class _BucketGameViewContentState extends State<_BucketGameViewContent> {
             theme: BucketVisualTheme.aquaGold,
             isUrgentSpin: isUrgent || state.isRevealing,
             revealedItem: state.revealedItem,
+            items: kBucketGameItems,
           ),
           if (state.roundResultBanner != null) ...[
             const SizedBox(height: 8),
