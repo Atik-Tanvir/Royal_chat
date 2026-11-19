@@ -174,7 +174,7 @@ class _RegionSelectorPageState extends State<RegionSelectorPage> {
 
   void _chooseRegion(String name) {
     widget.onSelectRegion?.call(name);
-    Navigator.pop(context);
+    Navigator.pop(context, name);
   }
 
   @override

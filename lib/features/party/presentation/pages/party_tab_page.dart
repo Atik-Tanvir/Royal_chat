@@ -15,6 +15,7 @@ import '../../domain/entities/party_room.dart';
 import '../widgets/create_room_dialog.dart';
 import '../widgets/room_restriction_dialog.dart';
 import 'live_audio_room_page.dart';
+import 'party_category_rooms_page.dart';
 import 'region_selector_page.dart';
 import '../../../profile/presentation/widgets/signin_reward_dialog.dart';
 import '../../../profile/presentation/pages/task_center_page.dart';
@@ -25,8 +26,106 @@ import '../../../profile/presentation/pages/coins_wallet_page.dart';
 import '../../../profile/presentation/bloc/profile_bloc.dart';
 import '../../../profile/presentation/bloc/profile_state.dart';
 
-class PartyTabPage extends StatelessWidget {
+class PartyTabPage extends StatefulWidget {
   const PartyTabPage({super.key});
+
+  @override
+  State<PartyTabPage> createState() => _PartyTabPageState();
+}
+
+class _PartyTabPageState extends State<PartyTabPage> {
+  String _selectedLanguage = 'All';
+  String _selectedRegion = 'All';
+
+  void _openLanguagePickerSheet(BuildContext context) {
+    final languages = [
+      {'name': 'All', 'label': 'All Languages', 'flag': '🌐'},
+      {'name': 'English', 'label': 'English', 'flag': '🇺🇸'},
+      {'name': 'বাংলা', 'label': 'বাংলা (Bangla)', 'flag': '🇧🇩'},
+      {'name': 'العربية', 'label': 'العربية (Arabic)', 'flag': '🇸🇦'},
+      {'name': 'हिन्दी', 'label': 'हिन्दी (Hindi)', 'flag': '🇮🇳'},
+      {'name': 'اردو', 'label': 'اردو (Urdu)', 'flag': '🇵🇰'},
+      {'name': 'Bahasa', 'label': 'Bahasa Indonesia', 'flag': '🇮🇩'},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          decoration: const BoxDecoration(
+            color: Color(0xFF13231B),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.translate, color: AppColors.gemCyan, size: 22),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'Select Room Language',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ...languages.map((l) {
+                final isSel = _selectedLanguage == l['name'];
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Text(l['flag']!, style: const TextStyle(fontSize: 20)),
+                  title: Text(
+                    l['label']!,
+                    style: TextStyle(
+                      color: isSel ? AppColors.gemCyan : Colors.white,
+                      fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                    ),
+                  ),
+                  trailing: isSel
+                      ? const Icon(Icons.check_circle_rounded, color: AppColors.gemCyan)
+                      : null,
+                  onTap: () {
+                    setState(() => _selectedLanguage = l['name']!);
+                    Navigator.pop(ctx);
+                  },
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openRegionPicker(BuildContext context) async {
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RegionSelectorPage(
+          selectedRegion: _selectedRegion,
+          onSelectRegion: (reg) {
+            if (mounted) setState(() => _selectedRegion = reg);
+          },
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() => _selectedRegion = result);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -414,27 +513,19 @@ class PartyTabPage extends StatelessWidget {
                   child: Row(
                     children: [
                       GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const RegionSelectorPage(),
-                            ),
-                          );
-                        },
-                        child: _buildFilterChip('All', icon: Icons.translate),
+                        onTap: () => _openLanguagePickerSheet(context),
+                        child: _buildFilterChip(
+                          _selectedLanguage,
+                          icon: Icons.translate,
+                        ),
                       ),
                       const SizedBox(width: 10),
                       GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const RegionSelectorPage(),
-                            ),
-                          );
-                        },
-                        child: _buildFilterChip('All', icon: Icons.language),
+                        onTap: () => _openRegionPicker(context),
+                        child: _buildFilterChip(
+                          _selectedRegion,
+                          icon: Icons.language,
+                        ),
                       ),
                     ],
                   ),
@@ -479,6 +570,57 @@ class PartyTabPage extends StatelessWidget {
 
                   // If a specific category filter is picked, show flat grid
                   if (state.selectedCategory != 'All') {
+                    final displayRooms = _selectedRegion == 'All'
+                        ? state.filteredRooms
+                        : state.filteredRooms.where((r) {
+                            return r.countryFlag.contains(_selectedRegion) ||
+                                r.title.toLowerCase().contains(_selectedRegion.toLowerCase());
+                          }).toList();
+
+                    if (displayRooms.isEmpty) {
+                      return SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 32),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  _getCategoryIcon(state.selectedCategory),
+                                  size: 60,
+                                  color: Colors.white24,
+                                ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  'No live rooms in ${state.selectedCategory}',
+                                  style: AppTextStyles.titleMedium.copyWith(color: Colors.white70),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Explore all categories or change region filter',
+                                  style: AppTextStyles.caption.copyWith(color: Colors.white38),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 18),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.gemEmerald,
+                                    foregroundColor: Colors.black,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                  ),
+                                  onPressed: () {
+                                    context.read<PartyBloc>().add(const SelectCategoryFilterEvent('All'));
+                                  },
+                                  child: const Text('Show All Rooms'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+
                     return SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
                       sliver: SliverGrid(
@@ -490,7 +632,7 @@ class PartyTabPage extends StatelessWidget {
                         ),
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
-                            final room = state.filteredRooms[index];
+                            final room = displayRooms[index];
                             return PartyRoomCard(
                               room: room,
                               onTap: () {
@@ -503,22 +645,31 @@ class PartyTabPage extends StatelessWidget {
                               },
                             );
                           },
-                          childCount: state.filteredRooms.length,
+                          childCount: displayRooms.length,
                         ),
                       ),
                     );
                   }
 
                   // Otherwise show grouped sections matching screenshot 4
-                  final luckyNumberRooms = state.allRooms.where((r) => r.category == 'Lucky Number').toList();
-                  final luckyRaceRooms = state.allRooms.where((r) => r.category == 'Lucky Race').toList();
-                  final chatRooms = state.allRooms.where((r) => r.category == 'Chatroom').toList();
+                  final baseRooms = _selectedRegion == 'All'
+                      ? state.allRooms
+                      : state.allRooms.where((r) {
+                          return r.countryFlag.contains(_selectedRegion) ||
+                              r.title.toLowerCase().contains(_selectedRegion.toLowerCase());
+                        }).toList();
+
+                  final luckyNumberRooms = baseRooms.where((r) => r.category == 'Lucky Number').toList();
+                  final luckyRaceRooms = baseRooms.where((r) => r.category == 'Lucky Race').toList();
+                  final chatRooms = baseRooms.where((r) => r.category == 'Chatroom').toList();
+                  final pkRooms = baseRooms.where((r) => r.category == 'PK').toList();
 
                   return SliverList(
                     delegate: SliverChildListDelegate([
-                      _buildRoomSection(context, 'Lucky Number', luckyNumberRooms, Icons.casino),
-                      _buildRoomSection(context, 'Lucky Race', luckyRaceRooms, Icons.sports_motorsports),
-                      _buildRoomSection(context, 'Chatroom', chatRooms, Icons.forum_rounded),
+                      _buildRoomSection(context, 'Lucky Number', luckyNumberRooms, Icons.casino_rounded, const Color(0xFF8B5CF6)),
+                      _buildRoomSection(context, 'Lucky Race', luckyRaceRooms, Icons.sports_motorsports_rounded, const Color(0xFFFFB800)),
+                      _buildRoomSection(context, 'Chatroom', chatRooms, Icons.forum_rounded, const Color(0xFFFF6B6B)),
+                      _buildRoomSection(context, 'PK', pkRooms, Icons.offline_bolt_rounded, const Color(0xFFFF3366)),
                       const SizedBox(height: 90), // Space for floating Create Room button
                     ]),
                   );
@@ -626,13 +777,44 @@ class PartyTabPage extends StatelessWidget {
     );
   }
 
+  IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'Lucky Number':
+        return Icons.casino_rounded;
+      case 'Lucky Race':
+        return Icons.sports_motorsports_rounded;
+      case 'Chatroom':
+        return Icons.forum_rounded;
+      case 'PK':
+        return Icons.offline_bolt_rounded;
+      default:
+        return Icons.grid_view_rounded;
+    }
+  }
+
   Widget _buildRoomSection(
     BuildContext context,
     String title,
     List<dynamic> rooms,
-    IconData icon,
-  ) {
+    IconData icon, [
+    Color? iconColor,
+  ]) {
     if (rooms.isEmpty) return const SizedBox.shrink();
+
+    final accentColor = iconColor ?? AppColors.goldCoin;
+
+    void openMorePage() {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PartyCategoryRoomsPage(
+            categoryName: title,
+            categoryIcon: icon,
+            categoryColor: accentColor,
+          ),
+        ),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -643,36 +825,48 @@ class PartyTabPage extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(icon, color: AppColors.goldCoin, size: 18),
-                  const SizedBox(width: 6),
-                  Text(
-                    title,
-                    style: AppTextStyles.titleBold.copyWith(
-                      color: Colors.white,
-                      fontSize: 15,
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: openMorePage,
+                child: Row(
+                  children: [
+                    Icon(icon, color: accentColor, size: 18),
+                    const SizedBox(width: 6),
+                    Text(
+                      title,
+                      style: AppTextStyles.titleBold.copyWith(
+                        color: Colors.white,
+                        fontSize: 15,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              Row(
-                children: [
-                  Text(
-                    'More',
-                    style: AppTextStyles.caption.copyWith(color: Colors.white60),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: openMorePage,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                  child: Row(
+                    children: [
+                      Text(
+                        'More',
+                        style: AppTextStyles.caption.copyWith(color: Colors.white60),
+                      ),
+                      const SizedBox(width: 2),
+                      const Icon(Icons.chevron_right, size: 16, color: Colors.white60),
+                    ],
                   ),
-                  const Icon(Icons.chevron_right, size: 16, color: Colors.white60),
-                ],
+                ),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          // 3-Column Grid for rooms in this section
+          // 3-Column Grid for rooms in this section (shows up to 6 rooms)
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: rooms.length > 3 ? 3 : rooms.length,
+            itemCount: rooms.length > 6 ? 6 : rooms.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
               mainAxisSpacing: 10,
