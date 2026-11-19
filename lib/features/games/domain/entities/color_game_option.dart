@@ -33,24 +33,25 @@ class ColorGameOption extends Equatable {
       ];
 }
 
-/// The 3 Color Zones from `game.game 2.html`: RED (1:2), VIOLET (1:4.5), GREEN (1:2)
+/// The 3 Color Zones for Color Spin (Vibrant RGB Neon Palette matching UI Mockup):
+/// RED (Win 1:2), VIOLET (Win 1:5), GREEN (Win 1:2)
 const List<ColorGameOption> kColorGameOptions = [
   ColorGameOption(
     id: 'red',
     name: 'RED',
     payoutLabel: 'Win 1:2',
     multiplier: 2.0,
-    gradientColors: [Color(0xFFFF416C), Color(0xFFFF4B2B)],
-    accentColor: Color(0xFFFF416C),
+    gradientColors: [Color(0xFFFF001E), Color(0xFFD50000)],
+    accentColor: Color(0xFFFF001E),
     emoji: '🔴',
   ),
   ColorGameOption(
     id: 'violet',
     name: 'VIOLET',
-    payoutLabel: 'Win 1:4.5',
-    multiplier: 4.5,
-    gradientColors: [Color(0xFF8A2BE2), Color(0xFF4A00E0)],
-    accentColor: Color(0xFF8A2BE2),
+    payoutLabel: 'Win 1:5',
+    multiplier: 5.0,
+    gradientColors: [Color(0xFF7C00FF), Color(0xFF6200D9)],
+    accentColor: Color(0xFF7C00FF),
     emoji: '🟣',
   ),
   ColorGameOption(
@@ -58,8 +59,8 @@ const List<ColorGameOption> kColorGameOptions = [
     name: 'GREEN',
     payoutLabel: 'Win 1:2',
     multiplier: 2.0,
-    gradientColors: [Color(0xFF11998E), Color(0xFF38EF7D)],
-    accentColor: Color(0xFF38EF7D),
+    gradientColors: [Color(0xFF00C853), Color(0xFF00A843)],
+    accentColor: Color(0xFF00C853),
     emoji: '🟢',
   ),
 ];

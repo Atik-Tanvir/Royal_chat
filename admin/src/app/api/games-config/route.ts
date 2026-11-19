@@ -49,17 +49,18 @@ const DEFAULT_CONFIG: {
     {
       id: 'game_color_3',
       name: 'Color Spin (Red / Violet / Green)',
-      description: '3-color cauldron prediction arena with per-color odds control.',
+      description: '3-color prediction arena with per-color odds and admin commission control.',
       isActive: true,
       minBet: 100,
       maxBet: 10000,
       rtp: 93,
-      roundSeconds: 35,
-      betLockSeconds: 30,
+      roundSeconds: 20,
+      betLockSeconds: 15,
       multipliers: {
         red: 2.0,
         violet: 4.5,
         green: 2.0,
+        adminCommissionPercent: 5.0,
       },
     },
     {
@@ -129,7 +130,9 @@ function sanitizeConfig(raw: Record<string, unknown>) {
       const mObj = match.multipliers as Record<string, unknown>;
       for (const [k, defVal] of Object.entries(fallback.multipliers)) {
         const parsed = Number(mObj[k]);
-        nextMultipliers[k] = Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed * 100) / 100 : defVal;
+        const allowZero = k.toLowerCase().includes('percent') || k.toLowerCase().includes('commission');
+        const isValid = Number.isFinite(parsed) && (allowZero ? parsed >= 0 : parsed > 0);
+        nextMultipliers[k] = isValid ? Math.round(parsed * 100) / 100 : defVal;
       }
     }
 

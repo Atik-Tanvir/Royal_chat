@@ -377,11 +377,39 @@ VALUES
 ('story_arafat_1', 'user_arafat', 'Arafat_BD', 'royal_avatar://AB:00897B', '🇧🇩', NULL, 'Good evening Dhaka! Looking for 7 Up 7 Down squadmates ☕🎲', 0, 41, 17)
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.rooms (id, title, host_name, host_avatar, category, country, country_flag, online_count, status)
+INSERT INTO public.rooms (id, title, host_id, host_name, host_avatar, category, country, country_flag, online_count, status)
 VALUES
-('room_101', 'Zzzzzzzzzz party vibe', 'Zzzzzzzzzz...', 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200', 'Lucky Number', 'Philippines', '🇵🇭', 18, 'live'),
-('room_102', '💖 ANG... VIP Lounge', '💖 ANG...', 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200', 'Lucky Number', 'Bangladesh', '🇧🇩', 24, 'live'),
-('room_103', 'Ayesha Chill Party', 'Ayesha4357', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200', 'Lucky Number', 'Bangladesh', '🇧🇩', 31, 'live')
+-- Lucky Number (🎰)
+('room_101', 'Zzzzzzzzzz party vibe', 'user_yanboyy', 'Zzzzzzzzzz...', 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200', 'Lucky Number', 'Philippines', '🇵🇭', 18, 'live'),
+('room_102', '💖 ANG... VIP Lounge', 'user_sadia', '💖 ANG...', 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200', 'Lucky Number', 'Bangladesh', '🇧🇩', 24, 'live'),
+('room_103', 'Ayesha Chill Party', 'user_arafat', 'Ayesha4357', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200', 'Lucky Number', 'Bangladesh', '🇧🇩', 31, 'live'),
+('room_104', 'Mega Jackpot 777 🎰', 'user_yanboyy', 'Tanvir_Pro', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', 'Lucky Number', 'Bangladesh', '🇧🇩', 45, 'live'),
+('room_105', 'High Rollers Dice Club 🎲', 'user_farhan', 'Ali_Khan_PK', 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200', 'Lucky Number', 'Pakistan', '🇵🇰', 38, 'live'),
+('room_106', 'Fortune Wheel VIP 💎', 'user_sadia', 'Priya_Royal', 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200', 'Lucky Number', 'India', '🇮🇳', 52, 'live'),
+
+-- Lucky Race (🟨 sports_motorsports / helmet)
+('race_201', 'Dhaka Nitro Drift 🏎️', 'user_arafat', 'Racer_Shanto', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200', 'Lucky Race', 'Bangladesh', '🇧🇩', 28, 'live'),
+('race_202', 'Formula Royal GP 🏁', 'user_farhan', 'Hamza_Speed', 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=200', 'Lucky Race', 'Pakistan', '🇵🇰', 42, 'live'),
+('race_203', 'Turbo Speed Challenge ⚡', 'developer_demo_user', 'Vikram_Rider', 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=200', 'Lucky Race', 'India', '🇮🇳', 35, 'live'),
+('race_204', 'Night Highway Racers 🌙', 'user_yanboyy', 'Fahim_Turbo', 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=200', 'Lucky Race', 'Bangladesh', '🇧🇩', 19, 'live'),
+('race_205', 'Supercar Apex Club 🏎️', 'user_farhan', 'Zeeshan_Apex', 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200', 'Lucky Race', 'Pakistan', '🇵🇰', 61, 'live'),
+('race_206', 'Speedway Champions 🏆', 'developer_demo_user', 'Rohit_Racer', 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200', 'Lucky Race', 'India', '🇮🇳', 33, 'live'),
+
+-- Chatroom (🟥 forum / chat bubbles)
+('chat_301', 'Night Adda & Acoustic 🎸', 'user_sadia', 'Nabila_Sings', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', 'Chatroom', 'Bangladesh', '🇧🇩', 64, 'live'),
+('chat_302', 'Late Night Melody ☕', 'user_farhan', 'Bilal_Acoustic', 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=200', 'Chatroom', 'Pakistan', '🇵🇰', 48, 'live'),
+('chat_303', 'Bollywood Chai & Talks 🎶', 'developer_demo_user', 'Ananya_Voice', 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200', 'Chatroom', 'India', '🇮🇳', 75, 'live'),
+('chat_304', 'Friendship Hub Dhaka ☕', 'user_arafat', 'Sabbir_Host', 'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=200', 'Chatroom', 'Bangladesh', '🇧🇩', 29, 'live'),
+('chat_305', 'Sufi Soul Nights 🌙', 'user_farhan', 'Zahra_Sufi', 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200', 'Chatroom', 'Pakistan', '🇵🇰', 53, 'live'),
+('chat_306', 'Desi Music & Chill 🎧', 'developer_demo_user', 'Arjun_Radio', 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200', 'Chatroom', 'India', '🇮🇳', 41, 'live'),
+
+-- PK (⚡ offline_bolt / lightning)
+('pk_401', 'Mega PK: Dhaka vs Lahore ⚡', 'user_yanboyy', 'Rifat_Boss', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', 'PK', 'Bangladesh', '🇧🇩', 88, 'live'),
+('pk_402', '1v1 Crown War: Gift Rush 👑', 'user_farhan', 'Faizan_King', 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200', 'PK', 'Pakistan', '🇵🇰', 95, 'live'),
+('pk_403', 'Royal Gladiator PK Arena ⚔️', 'user_sadia', 'Rhea_Warrior', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200', 'PK', 'India', '🇮🇳', 67, 'live'),
+('pk_404', 'Star Battle Live PK 💥', 'user_arafat', 'Mehedi_Host', 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=200', 'PK', 'Bangladesh', '🇧🇩', 54, 'live'),
+('pk_405', 'Ultimate Rivalry Showdown 🔥', 'user_farhan', 'Tariq_Pro', 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200', 'PK', 'Pakistan', '🇵🇰', 73, 'live'),
+('pk_406', 'Champion Belt PK Clash 🏆', 'developer_demo_user', 'Simran_Star', 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200', 'PK', 'India', '🇮🇳', 62, 'live')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.room_seats (room_id, seat_index, user_id, user_name, avatar_url, is_muted, is_locked)

@@ -14,11 +14,11 @@ class ColorGameBloc extends Bloc<ColorGameEvent, ColorGameState> {
   static const int _revealSeconds = 4;
 
   int get _bettingSeconds =>
-      state.gamesConfig.roundSecondsFor(_gameId, fallback: 35);
+      state.gamesConfig.roundSecondsFor(_gameId, fallback: 20);
   int get _lockWindowSeconds => max(
         0,
         _bettingSeconds -
-            state.gamesConfig.betLockSecondsFor(_gameId, fallback: 30),
+            state.gamesConfig.betLockSecondsFor(_gameId, fallback: 15),
       );
   int get _cycleSeconds => _bettingSeconds + _revealSeconds;
 
@@ -337,8 +337,20 @@ class ColorGameBloc extends Bloc<ColorGameEvent, ColorGameState> {
     );
     final multLabel = GamesControlConfig.formatMultiplier(mult);
 
-    final winCoins = (myBetOnWinner * mult).round();
-    final wonRound = winCoins > 0;
+    final grossWinCoins = (myBetOnWinner * mult).round();
+    final wonRound = grossWinCoins > 0;
+
+    int adminCutCoins = 0;
+    int netWinCoins = grossWinCoins;
+    final adminCommissionPercent = state.gamesConfig.adminCommissionPercentFor(
+      _gameId,
+      fallback: 5.0,
+    );
+
+    if (wonRound && adminCommissionPercent > 0) {
+      adminCutCoins = (grossWinCoins * (adminCommissionPercent / 100.0)).round();
+      netWinCoins = max(0, grossWinCoins - adminCutCoins);
+    }
 
     String? groupWinnerMsg;
     if (state.isGroupMode) {
@@ -361,10 +373,19 @@ class ColorGameBloc extends Bloc<ColorGameEvent, ColorGameState> {
       updatedHistory.removeRange(10, updatedHistory.length);
     }
 
+    final adminPctText = adminCommissionPercent % 1 == 0
+        ? adminCommissionPercent.toInt().toString()
+        : adminCommissionPercent.toStringAsFixed(1);
+
     String resultText;
     if (wonRound) {
-      resultText =
-          '🎉 Winner: ${winColor.emoji} ${winColor.name}! +$winCoins Coins ($multLabel)';
+      if (adminCutCoins > 0) {
+        resultText =
+            '🎉 Winner: ${winColor.emoji} ${winColor.name}! +$netWinCoins Coins ($multLabel • Admin fee: -$adminCutCoins [$adminPctText%])';
+      } else {
+        resultText =
+            '🎉 Winner: ${winColor.emoji} ${winColor.name}! +$netWinCoins Coins ($multLabel)';
+      }
     } else if (totalMyBet > 0) {
       resultText =
           'Winner: ${winColor.emoji} ${winColor.name} • -$totalMyBet Coins';
@@ -379,11 +400,11 @@ class ColorGameBloc extends Bloc<ColorGameEvent, ColorGameState> {
     double nextGuestBalance = state.guestFallbackBalance;
     int nextSyncTick = state.profileBalanceSyncTick;
 
-    if (winCoins > 0) {
+    if (netWinCoins > 0) {
       if (isGuest) {
-        nextGuestBalance += winCoins;
+        nextGuestBalance += netWinCoins;
       } else {
-        nextSyncedBalance += winCoins;
+        nextSyncedBalance += netWinCoins;
         nextSyncTick++;
       }
     }
@@ -401,15 +422,18 @@ class ColorGameBloc extends Bloc<ColorGameEvent, ColorGameState> {
       profileBalanceSyncTick: nextSyncTick,
     ));
 
-    if (winCoins > 0 && !isGuest) {
+    if (netWinCoins > 0 && !isGuest) {
       await repository.updateUserCoinBalance(
         userId: uid,
         newBalance: nextSyncedBalance,
       );
+      final txTitle = adminCutCoins > 0
+          ? 'Color Spin Win (${winColor.emoji} ${winColor.name} $multLabel • Net +$netWinCoins, Admin Cut -$adminCutCoins [$adminPctText%])'
+          : 'Color Spin Win (${winColor.emoji} ${winColor.name} $multLabel)';
       await repository.recordGameWinTransaction(
         userId: uid,
-        title: 'Color Spin Win (${winColor.emoji} ${winColor.name} $multLabel)',
-        winCoins: winCoins,
+        title: txTitle,
+        winCoins: netWinCoins,
         gateway: state.isGroupMode ? 'Color Spin (Group)' : 'Color Spin (Solo)',
       );
     }
@@ -432,9 +456,9 @@ class ColorGameBloc extends Bloc<ColorGameEvent, ColorGameState> {
       return;
     }
 
-    if (state.timeLeft <= _lockWindowSeconds || state.isRevealing) {
+    if (state.timeLeft <= 5 || state.timeLeft <= _lockWindowSeconds || state.isRevealing) {
       emit(state.copyWith(
-        uiFeedbackMessage: 'Round closing! Please wait for the next round.',
+        uiFeedbackMessage: '🔒 Betting is closed! Final draw in progress...',
         uiFeedbackNeedsAdRefill: false,
         uiFeedbackTick: state.uiFeedbackTick + 1,
       ));

@@ -11,16 +11,16 @@ import '../../domain/entities/games_control_config.dart';
 import '../bloc/color_game_bloc.dart';
 import '../bloc/color_game_event.dart';
 import '../bloc/color_game_state.dart';
+import 'color_wheel_arena_widget.dart';
 import 'game_board_chrome.dart';
 import 'game_coin_controls_bar.dart';
 import 'game_group_picker_sheet.dart';
 import 'rewarded_ad_player_dialog.dart';
-import 'swirling_bucket_widget.dart';
 
-/// Pure BLoC-driven Presentation Widget for Game #2: 3-Color Bucket Spin (`game.game 2.html`).
-/// - Swirling multi-color water bucket + floating ❓ center
-/// - After 35s, winning Color + Color Name rises out of the bucket
-/// - Solo & Group Modes + Double (1:2 / 1:4.5) payout + Admin-Controlled Rewarded Ads
+/// Pure BLoC-driven Presentation Widget for Game #2: 3-Color Rectangular Arena.
+/// - Pure high-contrast vibrant colors (Casino Red, Electric Royal Violet, Neon Emerald Green)
+/// - Rectangular fast color shuffle screen with intense 5-second draw suspense
+/// - Solo & Group Modes + Double (1:2 / 1:5) payout + Admin-controlled fee commission
 class ColorPredictionGameView extends StatelessWidget {
   final String? partyRoomId;
   final String? partyRoomName;
@@ -142,19 +142,10 @@ class _ColorGameViewContentState extends State<_ColorGameViewContent> {
       child: BlocBuilder<ColorGameBloc, ColorGameState>(
         builder: (context, state) {
           final gameBloc = context.read<ColorGameBloc>();
-          final isUrgent = state.timeLeft <= 5 && state.timeLeft > 0;
           final currentUid = AuthSessionManager.currentUserId;
           final balance = (currentUid == null || currentUid.isEmpty)
               ? state.guestFallbackBalance
               : state.syncedUserCoinBalance;
-
-          final revealBadge = state.revealedColor != null
-              ? BucketRevealBadge(
-                  label: state.revealedColor!.name,
-                  accentColor: state.revealedColor!.accentColor,
-                  colorSwatch: state.revealedColor!.gradientColors,
-                )
-              : null;
 
           return Container(
             decoration: BoxDecoration(
@@ -249,126 +240,115 @@ class _ColorGameViewContentState extends State<_ColorGameViewContent> {
                     }).toList(),
                   ),
 
-                  // Center Silver-Chrome Tri-Color Cauldron inside Spectrum Arena Card
-                  Container(
-                    margin: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: const Color(0xFFE879F9).withValues(alpha: 0.25),
-                      ),
+                  // Center 3-Color Wheel Arena with Prominent Top Diamond Pointer
+                  ColorWheelArenaWidget(
+                    timeLeft: state.timeLeft,
+                    isRevealing: state.isRevealing,
+                    revealedColor: state.revealedColor,
+                    didWin: state.didWinLastRound,
+                    redMultiplier: state.gamesConfig.multiplierFor(
+                      'game_color_3',
+                      'red',
+                      fallback: 2.0,
                     ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            _buildSideColorPill(
-                              color: const Color(0xFFFF2E54),
-                              label: 'RED',
-                              mult: GamesControlConfig.formatMultiplier(
-                                state.gamesConfig.multiplierFor(
-                                  'game_color_3',
-                                  'red',
-                                  fallback: 2.0,
-                                ),
-                              ),
-                            ),
-                            SwirlingBucketWidget(
-                              size: widget.isDrawerMode ? 124 : 142,
-                              theme: BucketVisualTheme.tricolorNeon,
-                              isUrgentSpin: isUrgent || state.isRevealing,
-                              revealBadge: revealBadge,
-                            ),
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _buildSideColorPill(
-                                  color: const Color(0xFF9333EA),
-                                  label: 'VIOLET',
-                                  mult: GamesControlConfig.formatMultiplier(
-                                    state.gamesConfig.multiplierFor(
-                                      'game_color_3',
-                                      'violet',
-                                      fallback: 4.5,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                _buildSideColorPill(
-                                  color: const Color(0xFF10B981),
-                                  label: 'GREEN',
-                                  mult: GamesControlConfig.formatMultiplier(
-                                    state.gamesConfig.multiplierFor(
-                                      'game_color_3',
-                                      'green',
-                                      fallback: 2.0,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        if (state.roundResultBanner != null) ...[
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: state.didWinLastRound
-                                  ? const Color(0xFF10B981).withValues(alpha: 0.25)
-                                  : Colors.white.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: state.didWinLastRound
-                                    ? const Color(0xFF34D399)
-                                    : AppColors.goldCoin.withValues(alpha: 0.45),
-                              ),
-                            ),
-                            child: Text(
-                              state.roundResultBanner!,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: state.didWinLastRound
-                                    ? const Color(0xFF6EE7B7)
-                                    : AppColors.goldCoin,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                        if (state.lastGroupWinnersSummary != null) ...[
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF10B981).withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: const Color(0xFF10B981).withValues(alpha: 0.6),
-                              ),
-                            ),
-                            child: Text(
-                              state.lastGroupWinnersSummary!,
-                              style: const TextStyle(
-                                color: Color(0xFF6EE7B7),
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
+                    violetMultiplier: state.gamesConfig.multiplierFor(
+                      'game_color_3',
+                      'violet',
+                      fallback: 5.0,
+                    ),
+                    greenMultiplier: state.gamesConfig.multiplierFor(
+                      'game_color_3',
+                      'green',
+                      fallback: 2.0,
                     ),
                   ),
 
+                  if (state.roundResultBanner != null) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: state.didWinLastRound
+                              ? const Color(0xFF10B981).withValues(alpha: 0.22)
+                              : Colors.white.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: state.didWinLastRound
+                                ? const Color(0xFF34D399)
+                                : AppColors.goldCoin.withValues(alpha: 0.45),
+                          ),
+                        ),
+                        child: Text(
+                          state.roundResultBanner!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: state.didWinLastRound
+                                ? const Color(0xFF6EE7B7)
+                                : AppColors.goldCoin,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (state.lastGroupWinnersSummary != null) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.6),
+                          ),
+                        ),
+                        child: Text(
+                          state.lastGroupWinnersSummary!,
+                          style: const TextStyle(
+                            color: Color(0xFF6EE7B7),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+
                   if (state.isGroupMode && state.recentGroupActivity.isNotEmpty)
                     _buildGroupActivityTicker(state),
+
+                  // Urgent Locking Banner in last 5 seconds
+                  if (state.timeLeft <= 5 && !state.isRevealing)
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF0055).withValues(alpha: 0.22),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFF2A55), width: 1.4),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.lock_rounded, color: Color(0xFFFF416C), size: 14),
+                          const SizedBox(width: 6),
+                          Text(
+                            '🔒 BETTING CLOSED • FINAL DRAW (00:0${state.timeLeft})',
+                            style: const TextStyle(
+                              color: Color(0xFFFF416C),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
                   // 3 Color Betting Zones (RED | VIOLET | GREEN)
                   Padding(
@@ -381,20 +361,26 @@ class _ColorGameViewContentState extends State<_ColorGameViewContent> {
                     ),
                   ),
 
-                  // Coin Controls
+                  // Coin Controls (Locked in last 5 seconds)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                    child: GameCoinControlsBar(
-                      controller: _coinInputController,
-                      currentAmount: state.betInputAmount,
-                      onDecrement: () =>
-                          gameBloc.add(const StepColorBetCoinEvent(isIncrement: false)),
-                      onIncrement: () =>
-                          gameBloc.add(const StepColorBetCoinEvent(isIncrement: true)),
-                      onTextChanged: (txt) =>
-                          gameBloc.add(UpdateColorCustomCoinTextEvent(txt)),
-                      onPresetSelected: (val) =>
-                          gameBloc.add(SetColorPresetCoinEvent(val)),
+                    child: IgnorePointer(
+                      ignoring: state.timeLeft <= 5 || state.isRevealing,
+                      child: Opacity(
+                        opacity: (state.timeLeft <= 5 || state.isRevealing) ? 0.55 : 1.0,
+                        child: GameCoinControlsBar(
+                          controller: _coinInputController,
+                          currentAmount: state.betInputAmount,
+                          onDecrement: () =>
+                              gameBloc.add(const StepColorBetCoinEvent(isIncrement: false)),
+                          onIncrement: () =>
+                              gameBloc.add(const StepColorBetCoinEvent(isIncrement: true)),
+                          onTextChanged: (txt) =>
+                              gameBloc.add(UpdateColorCustomCoinTextEvent(txt)),
+                          onPresetSelected: (val) =>
+                              gameBloc.add(SetColorPresetCoinEvent(val)),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -443,52 +429,6 @@ class _ColorGameViewContentState extends State<_ColorGameViewContent> {
     );
   }
 
-  Widget _buildSideColorPill({
-    required Color color,
-    required String label,
-    required String mult,
-  }) {
-    return Container(
-      width: 66,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.65), width: 1.1),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 14,
-            height: 14,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color,
-              border: Border.all(color: Colors.white, width: 1.5),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 8.5,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          Text(
-            mult,
-            style: TextStyle(
-              color: color.withValues(alpha: 0.95),
-              fontSize: 9.5,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildColorZoneCard(
     BuildContext context,
     ColorGameState state,
@@ -498,141 +438,210 @@ class _ColorGameViewContentState extends State<_ColorGameViewContent> {
     final groupBet = state.groupBetsByColor[option.id] ?? 0;
     final isSelected = myBet > 0;
     final isWinner = state.revealedColor?.id == option.id;
+    final isBettingLocked = state.timeLeft <= 5 || state.isRevealing;
 
     return GestureDetector(
-      onTap: () => context.read<ColorGameBloc>().add(PlaceColorBetEvent(option)),
+      onTap: () {
+        if (isBettingLocked) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('🔒 Betting is closed! Final draw in progress...'),
+              backgroundColor: Color(0xFFFF0055),
+              duration: Duration(milliseconds: 1400),
+            ),
+          );
+          return;
+        }
+        context.read<ColorGameBloc>().add(PlaceColorBetEvent(option));
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.symmetric(horizontal: 4),
-        height: 126,
+        height: 122,
         decoration: BoxDecoration(
-          color: const Color(0xFF170822),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isWinner
                 ? const Color(0xFFFFD700)
                 : isSelected
                     ? option.accentColor
-                    : option.accentColor.withValues(alpha: 0.45),
-            width: (isWinner || isSelected) ? 2.5 : 1.4,
+                    : option.accentColor.withValues(alpha: isBettingLocked ? 0.35 : 0.6),
+            width: isWinner ? 2.5 : (isSelected ? 2.0 : 1.2),
           ),
           boxShadow: [
             if (isWinner)
               BoxShadow(
-                color: option.accentColor.withValues(alpha: 0.8),
+                color: const Color(0xFFFFD700).withValues(alpha: 0.8),
                 blurRadius: 16,
                 spreadRadius: 2,
               )
             else if (isSelected)
               BoxShadow(
-                color: option.accentColor.withValues(alpha: 0.55),
+                color: option.accentColor.withValues(alpha: 0.5),
                 blurRadius: 10,
               ),
           ],
         ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            if (state.isGroupMode && groupBet > 0)
-              Positioned(
-                top: 5,
-                right: 6,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(15),
+          child: Column(
+            children: [
+              // Top 60%: Pure Solid Color Block with Name & Win Ratio
+              Expanded(
+                flex: 6,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '👥$groupBet',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 8.5,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            if (isWinner)
-              const Positioned(
-                top: 4,
-                left: 6,
-                child: Text('🏆', style: TextStyle(fontSize: 13)),
-              ),
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // 3D Glowing Color Gemstone Orb (distinct from Game #1 emoji tiles)
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: option.gradientColors,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    border: Border.all(color: Colors.white, width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: option.accentColor.withValues(alpha: 0.65),
-                        blurRadius: 10,
+                  width: double.infinity,
+                  color: isBettingLocked && !isWinner
+                      ? option.accentColor.withValues(alpha: 0.85)
+                      : option.accentColor,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      if (state.isGroupMode && groupBet > 0)
+                        Positioned(
+                          top: 4,
+                          right: 5,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.55),
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Text(
+                              '👥$groupBet',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (isWinner)
+                        const Positioned(
+                          top: 4,
+                          left: 5,
+                          child: Text('🏆', style: TextStyle(fontSize: 12)),
+                        )
+                      else if (isBettingLocked)
+                        Positioned(
+                          top: 4,
+                          left: 5,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.55),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.lock_rounded, color: Colors.white70, size: 8.5),
+                                SizedBox(width: 2),
+                                Text(
+                                  'LOCK',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 7.5,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            option.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            GamesControlConfig.formatWinRatio(
+                              state.gamesConfig.multiplierFor(
+                                'game_color_3',
+                                option.id,
+                                fallback: option.multiplier,
+                              ),
+                            ),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  option.name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.9,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  GamesControlConfig.formatWinRatio(
-                    state.gamesConfig.multiplierFor(
-                      'game_color_3',
-                      option.id,
-                      fallback: option.multiplier,
+              ),
+
+              // Bottom 40%: Dark Background with Coin Chip Indicator
+              Expanded(
+                flex: 4,
+                child: Container(
+                  width: double.infinity,
+                  color: const Color(0xFF0C0212),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.55),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected
+                              ? option.accentColor.withValues(alpha: 0.8)
+                              : Colors.white.withValues(alpha: 0.15),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 14,
+                            height: 14,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [Color(0xFFFFE066), Color(0xFFF59E0B)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                '🪙',
+                                style: TextStyle(fontSize: 9),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$myBet',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  style: TextStyle(
-                    color: option.accentColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
                 ),
-                const SizedBox(height: 5),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? option.accentColor.withValues(alpha: 0.25)
-                        : Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isSelected
-                          ? option.accentColor
-                          : Colors.white.withValues(alpha: 0.14),
-                    ),
-                  ),
-                  child: Text(
-                    '🪙 $myBet',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );

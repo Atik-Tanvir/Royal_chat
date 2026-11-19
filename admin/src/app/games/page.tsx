@@ -78,6 +78,7 @@ const GAME_UI_META: Record<string, GameUiMeta> = {
       { key: 'red', label: '🔴 RED Multiplier', unit: 'x', accent: 'text-red-400', step: 0.5, min: 1 },
       { key: 'violet', label: '🟣 VIOLET Multiplier', unit: 'x', accent: 'text-purple-400', step: 0.5, min: 1 },
       { key: 'green', label: '🟢 GREEN Multiplier', unit: 'x', accent: 'text-emerald-400', step: 0.5, min: 1 },
+      { key: 'adminCommissionPercent', label: '👑 Admin Cut (% from Winner Reward)', unit: '%', accent: 'text-amber-300', step: 1, min: 0 },
     ],
   },
   game_7up_7down: {
@@ -124,14 +125,14 @@ const DEFAULT_GAMES: GameControlConfig[] = [
   {
     id: 'game_color_3',
     name: 'Color Spin (Red / Violet / Green)',
-    description: '3-color cauldron prediction arena with per-color odds control.',
+    description: '3-color prediction arena with per-color odds and admin commission control.',
     isActive: true,
     minBet: 100,
     maxBet: 10000,
     rtp: 93,
-    roundSeconds: 35,
-    betLockSeconds: 30,
-    multipliers: { red: 2, violet: 4.5, green: 2 },
+    roundSeconds: 20,
+    betLockSeconds: 15,
+    multipliers: { red: 2, violet: 4.5, green: 2, adminCommissionPercent: 5 },
   },
   {
     id: 'game_7up_7down',
@@ -239,6 +240,8 @@ export default function GamesControlPage() {
 
   function updateMultiplier(gameId: string, key: string, rawValue: string) {
     const num = Number(rawValue);
+    const isPercent = key.toLowerCase().includes('percent') || key.toLowerCase().includes('commission');
+    const minVal = isPercent ? 0 : 1;
     setGames((prev) =>
       prev.map((g) =>
         g.id === gameId
@@ -246,7 +249,7 @@ export default function GamesControlPage() {
               ...g,
               multipliers: {
                 ...g.multipliers,
-                [key]: Number.isFinite(num) && num > 0 ? num : 1,
+                [key]: Number.isFinite(num) && num >= minVal ? num : minVal,
               },
             }
           : g

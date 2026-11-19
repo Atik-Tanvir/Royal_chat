@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
-import '../../domain/entities/party_room.dart';
 import '../bloc/party_bloc.dart';
 import '../bloc/party_event.dart';
 import '../bloc/party_state.dart';

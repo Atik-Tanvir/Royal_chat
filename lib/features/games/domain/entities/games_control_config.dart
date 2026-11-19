@@ -43,6 +43,12 @@ class GameControlItemConfig extends Equatable {
     return val.round();
   }
 
+  double adminCommissionPercent({double fallback = 5.0}) {
+    final val = multipliers['adminCommissionPercent'];
+    if (val != null && val >= 0) return val;
+    return fallback;
+  }
+
   factory GameControlItemConfig.fromJson(Map<String, dynamic> json) {
     final rawMults = json['multipliers'];
     final parsedMults = <String, double>{};
@@ -52,7 +58,7 @@ class GameControlItemConfig extends Equatable {
         final numVal = (entry.value is num)
             ? (entry.value as num).toDouble()
             : double.tryParse(entry.value.toString());
-        if (numVal != null && numVal > 0) {
+        if (numVal != null && numVal >= 0) {
           parsedMults[key] = numVal;
         }
       }
@@ -130,17 +136,18 @@ class GamesControlConfig extends Equatable {
       'game_color_3': GameControlItemConfig(
         id: 'game_color_3',
         name: 'Color Spin (Red / Violet / Green)',
-        description: '3-color cauldron prediction arena with per-color odds control.',
+        description: '3-color prediction arena with per-color odds and admin commission control.',
         isActive: true,
         minBet: 100,
         maxBet: 10000,
         rtp: 93,
-        roundSeconds: 35,
-        betLockSeconds: 30,
+        roundSeconds: 20,
+        betLockSeconds: 15,
         multipliers: {
           'red': 2.0,
-          'violet': 4.5,
+          'violet': 5.0,
           'green': 2.0,
+          'adminCommissionPercent': 5.0,
         },
       ),
       'game_7up_7down': GameControlItemConfig(
@@ -232,6 +239,13 @@ class GamesControlConfig extends Equatable {
     required int fallback,
   }) {
     return gameFor(gameId).intParamFor(key, fallback: fallback);
+  }
+
+  double adminCommissionPercentFor(
+    String gameId, {
+    double fallback = 5.0,
+  }) {
+    return gameFor(gameId).adminCommissionPercent(fallback: fallback);
   }
 
   /// Formats a numeric multiplier cleanly (e.g. `2.0 -> "2x"`, `4.5 -> "4.5x"`).
