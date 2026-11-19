@@ -1,31 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../core/config/auth_session_manager.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/custom_avatar.dart';
 import '../../domain/entities/moment_story.dart';
 import '../bloc/moments_bloc.dart';
 import '../bloc/moments_state.dart';
-import '../pages/create_story_sheet.dart';
 import '../pages/story_viewer_page.dart';
 import 'moment_media_image.dart';
 
 /// Horizontal Stories rail shown at the top of the Moments feed.
 class StoriesBarWidget extends StatelessWidget {
   const StoriesBarWidget({super.key});
-
-  void _openCreateStory(BuildContext context) {
-    final bloc = context.read<MomentsBloc>();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => BlocProvider.value(
-        value: bloc,
-        child: const CreateStorySheet(),
-      ),
-    );
-  }
 
   void _openStoryStack(
     BuildContext context,
@@ -52,10 +37,7 @@ class StoriesBarWidget extends StatelessWidget {
     return BlocBuilder<MomentsBloc, MomentsState>(
       builder: (context, state) {
         final stories = state.stories;
-        final myId = AuthSessionManager.currentUserId;
-        final myProfile = state.mySocialProfile;
-        final myStories =
-            stories.where((s) => s.authorId == myId).toList();
+        if (stories.isEmpty) return const SizedBox.shrink();
 
         return Container(
           height: 118,
@@ -64,18 +46,7 @@ class StoriesBarWidget extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 14),
             children: [
-              // Add / My Story Tile
-              _AddStoryTile(
-                avatarUrl: myProfile?.avatarUrl ?? '',
-                nickname: myProfile?.nickname ?? 'Your Story',
-                hasMyStory: myStories.isNotEmpty,
-                onAddTap: () => _openCreateStory(context),
-                onViewMyStory: myStories.isNotEmpty
-                    ? () => _openStoryStack(context, myStories, 0)
-                    : () => _openCreateStory(context),
-              ),
-
-              // Community Stories
+              // Community Stories (View-only, no story creation)
               ...List.generate(stories.length, (idx) {
                 final story = stories[idx];
                 final isViewed = state.viewedStoryIds.contains(story.id);
@@ -89,95 +60,6 @@ class StoriesBarWidget extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _AddStoryTile extends StatelessWidget {
-  final String avatarUrl;
-  final String nickname;
-  final bool hasMyStory;
-  final VoidCallback onAddTap;
-  final VoidCallback onViewMyStory;
-
-  const _AddStoryTile({
-    required this.avatarUrl,
-    required this.nickname,
-    required this.hasMyStory,
-    required this.onAddTap,
-    required this.onViewMyStory,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: hasMyStory ? onViewMyStory : onAddTap,
-      child: Container(
-        width: 82,
-        margin: const EdgeInsets.only(right: 10),
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white24),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(2.5),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: hasMyStory ? AppColors.accentOrange : Colors.white54,
-                      width: 2,
-                    ),
-                  ),
-                  child: CustomAvatar(
-                    imageUrl: avatarUrl,
-                    fallbackName: nickname,
-                    radius: 23,
-                  ),
-                ),
-                Positioned(
-                  right: -2,
-                  bottom: -2,
-                  child: GestureDetector(
-                    onTap: onAddTap,
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      decoration: const BoxDecoration(
-                        color: AppColors.accentOrange,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.add_rounded,
-                        color: Colors.white,
-                        size: 14,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Your Story',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

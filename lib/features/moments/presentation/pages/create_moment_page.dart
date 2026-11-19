@@ -19,7 +19,6 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
   final TextEditingController _textController = TextEditingController();
   final List<String> _attachedImages = [];
   bool _isUploading = false;
-  bool _shareToStory = false;
   String? _selectedTopic;
   String? _selectedLocation;
 
@@ -41,9 +40,7 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
     String fullContent = text;
     if (_selectedTopic != null) fullContent += ' #$_selectedTopic';
 
-    final category = (_selectedTopic == 'TikTokReels' || _selectedTopic == 'Video')
-        ? 'Video'
-        : (_selectedTopic ?? 'Moments');
+    final category = _selectedTopic ?? 'Moments';
 
     context.read<MomentsBloc>().add(
           CreateMomentEvent(
@@ -51,15 +48,13 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
             imageUrls: _attachedImages,
             category: category,
             location: _selectedLocation,
-            shareToStory: _shareToStory,
+            shareToStory: false,
           ),
         );
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_shareToStory
-            ? '✨ Moment & Story published!'
-            : '✨ Moment published!'),
+      const SnackBar(
+        content: Text('✨ Post published to community feed!'),
         backgroundColor: AppColors.gemEmerald,
       ),
     );
@@ -123,7 +118,8 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
             children: [
               ListTile(
                 leading: const Icon(Icons.photo_library_rounded, color: AppColors.gemEmerald),
-                title: const Text('Choose from Gallery', style: TextStyle(color: Colors.white)),
+                title: const Text('Choose Photo from Gallery', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                subtitle: const Text('Images only (PNG, JPG) • No video uploads', style: TextStyle(color: Colors.white60, fontSize: 12)),
                 onTap: () {
                   Navigator.pop(ctx);
                   _pickAndUploadPhoto(ImageSource.gallery);
@@ -131,7 +127,8 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
               ),
               ListTile(
                 leading: const Icon(Icons.camera_alt_rounded, color: AppColors.goldCoin),
-                title: const Text('Take a Photo', style: TextStyle(color: Colors.white)),
+                title: const Text('Take a Photo with Camera', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                subtitle: const Text('Photos only • No video recording', style: TextStyle(color: Colors.white60, fontSize: 12)),
                 onTap: () {
                   Navigator.pop(ctx);
                   _pickAndUploadPhoto(ImageSource.camera);
@@ -258,26 +255,27 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
             const Divider(color: Color(0xFFF1F5F9)),
             const SizedBox(height: 16),
             Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: const Color(0xFFF3F7F4),
+                color: const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
-              child: SwitchListTile.adaptive(
-                value: _shareToStory,
-                activeColor: AppColors.accentOrange,
-                onChanged: (v) => setState(() => _shareToStory = v),
-                title: const Text(
-                  'Also Share to My 24h Story',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    color: AppColors.textDark,
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 20, color: AppColors.primaryGreen),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Post with your ID: Photos & text status only. Story creation and video uploads are not supported.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF475569),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
-                ),
-                subtitle: const Text(
-                  'Highlight this status & photo in top Stories bar',
-                  style: TextStyle(fontSize: 11, color: AppColors.textMuted),
-                ),
+                ],
               ),
             ),
             const SizedBox(height: 16),
@@ -373,7 +371,7 @@ class _CreateMomentPageState extends State<CreateMomentPage> {
   }
 
   void _showTopicSelector() {
-    final topics = ['TikTokReels', 'Video', 'RoyalParty', 'VoiceRoom', 'LuckyRace', 'MusicLive', 'Hangout'];
+    final topics = ['DailyLife', 'RoyalParty', 'VoiceRoom', 'LuckyRace', 'MusicLive', 'Hangout', 'GameGala'];
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(

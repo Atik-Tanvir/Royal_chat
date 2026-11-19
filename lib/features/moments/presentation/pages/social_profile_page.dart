@@ -7,7 +7,6 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/r2_storage_service.dart';
 import '../../../../core/widgets/custom_avatar.dart';
 import '../../domain/entities/moment_post.dart';
-import '../../domain/entities/moment_story.dart';
 import '../../domain/entities/social_profile.dart';
 import '../bloc/moments_bloc.dart';
 import '../bloc/moments_event.dart';
@@ -15,8 +14,6 @@ import '../bloc/moments_state.dart';
 import '../widgets/moment_media_image.dart';
 import '../widgets/moment_post_card.dart';
 import 'create_moment_page.dart';
-import 'create_story_sheet.dart';
-import 'story_viewer_page.dart';
 
 const List<List<Color>> kProfileCoverGradients = [
   [Color(0xFF0E6B47), Color(0xFF042D20)],
@@ -84,19 +81,6 @@ class _SocialProfilePageState extends State<SocialProfilePage> {
     );
   }
 
-  void _openCreateStory(BuildContext context) {
-    final bloc = context.read<MomentsBloc>();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => BlocProvider.value(
-        value: bloc,
-        child: const CreateStorySheet(),
-      ),
-    );
-  }
-
   void _openCreatePost(BuildContext context) {
     final bloc = context.read<MomentsBloc>();
     Navigator.push(
@@ -121,13 +105,8 @@ class _SocialProfilePageState extends State<SocialProfilePage> {
         final userPosts = state.posts
             .where((p) => p.authorId == profile.userId)
             .toList();
-        final userStories = state.stories
-            .where((s) => s.authorId == profile.userId)
-            .toList();
         final userPhotos = <String>[
           for (final p in userPosts) ...p.imageUrls,
-          for (final s in userStories)
-            if (s.mediaUrl != null && s.mediaUrl!.isNotEmpty) s.mediaUrl!,
         ];
         final totalLoves =
             userPosts.fold<int>(0, (sum, p) => sum + p.likesCount);
@@ -137,7 +116,7 @@ class _SocialProfilePageState extends State<SocialProfilePage> {
             profile.coverGradientIndex % kProfileCoverGradients.length];
 
         return DefaultTabController(
-          length: 4,
+          length: 3,
           child: Scaffold(
             backgroundColor: const Color(0xFFF3F7F4),
             body: NestedScrollView(
@@ -422,7 +401,7 @@ class _SocialProfilePageState extends State<SocialProfilePage> {
                           child: Row(
                             children: [
                               _statTile('${userPosts.length}', 'Posts'),
-                              _statTile('${userStories.length}', 'Stories'),
+                              _statTile('${userPhotos.length}', 'Photos'),
                               _statTile('$totalLoves', 'Loves'),
                               _statTile('${profile.followersCount}', 'Followers'),
                             ],
@@ -433,12 +412,13 @@ class _SocialProfilePageState extends State<SocialProfilePage> {
                           Row(
                             children: [
                               Expanded(
+                                flex: 3,
                                 child: ElevatedButton.icon(
                                   onPressed: () => _openCreatePost(context),
                                   icon: const Icon(Icons.add_photo_alternate_rounded,
                                       size: 18, color: Colors.white),
                                   label: const Text(
-                                    'New Post',
+                                    'Create Post',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w700,
@@ -454,19 +434,17 @@ class _SocialProfilePageState extends State<SocialProfilePage> {
                               ),
                               const SizedBox(width: 10),
                               Expanded(
+                                flex: 2,
                                 child: OutlinedButton.icon(
-                                  onPressed: () => _openCreateStory(context),
-                                  icon: const Icon(Icons.auto_awesome_rounded,
-                                      size: 18),
+                                  onPressed: () => _openEditProfileSheet(context, profile),
+                                  icon: const Icon(Icons.edit_rounded, size: 17),
                                   label: const Text(
-                                    'Add Story',
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.w700),
+                                    'Edit Profile',
+                                    style: TextStyle(fontWeight: FontWeight.w700),
                                   ),
                                   style: OutlinedButton.styleFrom(
-                                    foregroundColor: AppColors.accentOrange,
-                                    side: const BorderSide(
-                                        color: AppColors.accentOrange),
+                                    foregroundColor: AppColors.primaryGreen,
+                                    side: const BorderSide(color: AppColors.primaryGreen),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(20),
                                     ),
@@ -494,7 +472,6 @@ class _SocialProfilePageState extends State<SocialProfilePage> {
                       tabs: [
                         Tab(text: 'Posts'),
                         Tab(text: 'Photos'),
-                        Tab(text: 'Stories'),
                         Tab(text: 'About & ID'),
                       ],
                     ),
@@ -525,7 +502,7 @@ class _SocialProfilePageState extends State<SocialProfilePage> {
                           icon: Icons.photo_library_outlined,
                           title: 'No uploaded photos',
                           subtitle:
-                              'Photos from posts and stories appear here.',
+                              'Photos from your moments posts appear here.',
                         )
                       : GridView.builder(
                           padding: const EdgeInsets.all(14),
@@ -545,41 +522,14 @@ class _SocialProfilePageState extends State<SocialProfilePage> {
                           ),
                         ),
 
-                  // 3. Stories Tab
-                  userStories.isEmpty
-                      ? _emptyState(
-                          icon: Icons.amp_stories_outlined,
-                          title: 'No active 24h stories',
-                          subtitle: isMine
-                              ? 'Tap "Add Story" above to post a 24h status or photo story.'
-                              : 'No active stories right now.',
-                        )
-                      : GridView.builder(
-                          padding: const EdgeInsets.all(14),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 10,
-                            mainAxisSpacing: 10,
-                            childAspectRatio: 0.72,
-                          ),
-                          itemCount: userStories.length,
-                          itemBuilder: (_, idx) => _buildStoryCard(
-                            context,
-                            userStories[idx],
-                            userStories,
-                            idx,
-                          ),
-                        ),
-
-                  // 4. About & ID Tab
+                  // 3. About & ID Tab
                   ListView(
                     padding: const EdgeInsets.all(14),
                     children: [
                       _aboutCard(
                         profile: profile,
                         postsCount: userPosts.length,
-                        storiesCount: userStories.length,
+                        photosCount: userPhotos.length,
                         totalLoves: totalLoves,
                         totalShares: totalShares,
                         likedByMeCount: state.likedPostIds.length,
@@ -649,101 +599,10 @@ class _SocialProfilePageState extends State<SocialProfilePage> {
     );
   }
 
-  Widget _buildStoryCard(
-    BuildContext context,
-    MomentStory story,
-    List<MomentStory> stack,
-    int index,
-  ) {
-    final colors =
-        kStoryGradients[story.bgGradientIndex % kStoryGradients.length];
-    final bloc = context.read<MomentsBloc>();
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BlocProvider.value(
-              value: bloc,
-              child: StoryViewerPage(stories: stack, initialIndex: index),
-            ),
-          ),
-        );
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            colors: colors,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              if (story.mediaUrl != null && story.mediaUrl!.isNotEmpty)
-                MomentMediaImage(source: story.mediaUrl!, fit: BoxFit.cover),
-              Container(color: Colors.black.withOpacity(0.28)),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.visibility_rounded,
-                            color: Colors.white70, size: 14),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${story.viewsCount}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const Spacer(),
-                        const Icon(Icons.favorite_rounded,
-                            color: Colors.pinkAccent, size: 14),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${story.likesCount}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    Text(
-                      story.caption.isEmpty ? 'Photo Story' : story.caption,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _aboutCard({
     required SocialProfileDetails profile,
     required int postsCount,
-    required int storiesCount,
+    required int photosCount,
     required int totalLoves,
     required int totalShares,
     required int likedByMeCount,
@@ -780,7 +639,7 @@ class _SocialProfilePageState extends State<SocialProfilePage> {
           _infoRow(Icons.location_city_rounded, 'Location', profile.location),
           _infoRow(Icons.star_rounded, 'Social Level', 'Level ${profile.level}'),
           _infoRow(Icons.article_rounded, 'Total Posts & Reposts', '$postsCount'),
-          _infoRow(Icons.auto_stories_rounded, 'Active Stories', '$storiesCount'),
+          _infoRow(Icons.photo_library_rounded, 'Uploaded Photos', '$photosCount'),
           _infoRow(Icons.favorite_rounded, 'Total Loves Received', '$totalLoves'),
           _infoRow(Icons.share_rounded, 'Total Shares Received', '$totalShares'),
           if (isMine)

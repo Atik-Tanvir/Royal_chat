@@ -1,4 +1,15 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
+
+/// Shared gradient palettes used by Status Stories and Story Viewer.
+const List<List<Color>> kStoryGradients = [
+  [Color(0xFF0E6B47), Color(0xFF063B27)],
+  [Color(0xFFFF8F00), Color(0xFFE65100)],
+  [Color(0xFF7B1FA2), Color(0xFF4A148C)],
+  [Color(0xFF1565C0), Color(0xFF0D47A1)],
+  [Color(0xFFC2185B), Color(0xFF880E4F)],
+  [Color(0xFF00796B), Color(0xFF004D40)],
+];
 
 /// Represents a 24-hour status or photo story shared in the Moments community.
 class MomentStory extends Equatable {

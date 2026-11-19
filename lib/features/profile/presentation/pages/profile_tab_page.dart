@@ -558,7 +558,7 @@ class ProfileTabPage extends StatelessWidget {
           _buildMenuItem(
             icon: Icons.dynamic_feed_rounded,
             iconColor: AppColors.accentOrange,
-            title: 'My Social Profile (Posts & Stories)',
+            title: 'My Social Profile (Posts & Photos)',
             trailingWidget: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

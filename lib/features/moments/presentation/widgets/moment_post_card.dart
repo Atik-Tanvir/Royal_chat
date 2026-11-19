@@ -109,22 +109,6 @@ class MomentPostCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 _shareOptionTile(
-                  icon: Icons.auto_awesome_rounded,
-                  color: AppColors.accentOrange,
-                  title: 'Share to My Story (24h)',
-                  subtitle: 'Feature this moment in the top Stories rail',
-                  onTap: () {
-                    bloc.add(
-                      SharePostEvent(
-                        postId: post.id,
-                        target: SharePostTarget.shareToStory,
-                      ),
-                    );
-                    Navigator.pop(sheetCtx);
-                  },
-                ),
-                const SizedBox(height: 8),
-                _shareOptionTile(
                   icon: Icons.copy_rounded,
                   color: Colors.blueGrey,
                   title: 'Copy Post Link & Text',

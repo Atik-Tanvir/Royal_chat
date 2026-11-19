@@ -9,7 +9,6 @@ import '../widgets/moment_post_card.dart';
 import '../widgets/stories_bar_widget.dart';
 import '../widgets/tiktok_reels_view.dart';
 import 'create_moment_page.dart';
-import 'create_story_sheet.dart';
 import 'social_profile_page.dart';
 
 class MomentsTabPage extends StatefulWidget {
@@ -50,19 +49,6 @@ class _MomentsTabPageState extends State<MomentsTabPage> {
           value: bloc,
           child: const CreateMomentPage(),
         ),
-      ),
-    );
-  }
-
-  void _openCreateStory(BuildContext context) {
-    final bloc = context.read<MomentsBloc>();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => BlocProvider.value(
-        value: bloc,
-        child: const CreateStorySheet(),
       ),
     );
   }
@@ -115,26 +101,10 @@ class _MomentsTabPageState extends State<MomentsTabPage> {
                   'Create Moment Post',
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
-                subtitle: const Text('Upload photos, write status & tag location'),
+                subtitle: const Text('Post photos & text status with your ID (No video)'),
                 onTap: () {
                   Navigator.pop(ctx);
                   _openCreateMoment(context);
-                },
-              ),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFFFF3E0),
-                  child: Icon(Icons.auto_awesome_rounded,
-                      color: AppColors.accentOrange),
-                ),
-                title: const Text(
-                  'Share 24h Story & Status',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
-                subtitle: const Text('Upload a story photo or colorful status card'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _openCreateStory(context);
                 },
               ),
               ListTile(
@@ -147,7 +117,7 @@ class _MomentsTabPageState extends State<MomentsTabPage> {
                   'My Social Profile & ID',
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
-                subtitle: const Text('Manage bio, avatar, posts, photos & stories'),
+                subtitle: const Text('Manage bio, avatar, user ID, posts & photos'),
                 onTap: () {
                   Navigator.pop(ctx);
                   _openMySocialProfile(context);
@@ -363,11 +333,11 @@ class _MomentsTabPageState extends State<MomentsTabPage> {
                                                   _openCreateMoment(context),
                                             ),
                                             _composerShortcut(
-                                              icon: Icons.auto_awesome_rounded,
-                                              color: AppColors.accentOrange,
-                                              label: 'Share Story',
+                                              icon: Icons.edit_note_rounded,
+                                              color: AppColors.goldCoin,
+                                              label: 'Write Post',
                                               onTap: () =>
-                                                  _openCreateStory(context),
+                                                  _openCreateMoment(context),
                                             ),
                                             _composerShortcut(
                                               icon: Icons.person_outline_rounded,
