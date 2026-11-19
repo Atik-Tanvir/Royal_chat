@@ -11,7 +11,7 @@ import '../../domain/repositories/moments_repository.dart';
 /// starter community data so the social feed always renders cleanly offline & online.
 class MomentsRepositoryImpl implements MomentsRepository {
   static const String _postsKey = 'gamegala_moments_posts_v2';
-  static const String _storiesKey = 'gamegala_moments_stories_v2';
+  static const String _storiesKey = 'gamegala_moments_stories_v3';
   static const String _likedKey = 'royal_liked_moments';
   static const String _viewedStoriesKey = 'gamegala_viewed_stories_v2';
   static const String _followedKey = 'gamegala_followed_authors_v2';
@@ -392,6 +392,10 @@ class MomentsRepositoryImpl implements MomentsRepository {
         mediaUrl: 'royal_art://lucky_wheel',
         caption: '250K coin Lucky Wheel streak! Spin with us today 🎯',
         bgGradientIndex: 1,
+        roomId: 'room_yanboyy_lucky',
+        roomTitle: '250K Coin Lucky Room',
+        roomCategory: 'Lucky Number',
+        roomOnlineCount: 38,
         createdAt: now.subtract(const Duration(hours: 2)),
         expiresAt: now.add(const Duration(hours: 22)),
         viewsCount: 64,
@@ -406,6 +410,10 @@ class MomentsRepositoryImpl implements MomentsRepository {
         mediaUrl: 'royal_art://party_stage',
         caption: 'Golden Mic Acoustic Room live soon — join stage!',
         bgGradientIndex: 2,
+        roomId: 'room_sadia_mic',
+        roomTitle: 'Golden Mic Acoustic Stage',
+        roomCategory: 'Chatroom',
+        roomOnlineCount: 75,
         createdAt: now.subtract(const Duration(hours: 4)),
         expiresAt: now.add(const Duration(hours: 20)),
         viewsCount: 112,
@@ -420,6 +428,10 @@ class MomentsRepositoryImpl implements MomentsRepository {
         mediaUrl: null,
         caption: 'Good evening Dhaka! Looking for 7 Up 7 Down squadmates ☕🎲',
         bgGradientIndex: 0,
+        roomId: 'room_arafat_squad',
+        roomTitle: '7 Up 7 Down Squad Room',
+        roomCategory: 'PK',
+        roomOnlineCount: 19,
         createdAt: now.subtract(const Duration(hours: 5)),
         expiresAt: now.add(const Duration(hours: 19)),
         viewsCount: 41,

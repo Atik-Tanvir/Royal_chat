@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/config/auth_session_manager.dart';
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/widgets/custom_avatar.dart';
+import '../../../party/presentation/pages/live_audio_room_page.dart';
 import '../../domain/entities/moment_story.dart';
 import '../bloc/moments_bloc.dart';
 import '../bloc/moments_event.dart';
@@ -250,6 +252,90 @@ class _StoryViewerPageState extends State<StoryViewerPage> {
                     ],
                   ),
                 ),
+
+                // Join Live Room Banner (when story promotes a room)
+                if (story.isRoomStory)
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 68,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.goldCoin.withOpacity(0.8), width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.goldCoin.withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: AppColors.goldCoin.withOpacity(0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.mic_external_on_rounded, color: AppColors.goldCoin, size: 20),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  story.roomTitle ?? 'Popular Live Room',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    const Text('🔴 LIVE • ', style: TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                                    Text(
+                                      '${story.roomOnlineCount ?? 1} Listeners',
+                                      style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => LiveAudioRoomPage(room: story.toPartyRoom()),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.meeting_room_rounded, size: 15, color: Colors.black87),
+                            label: const Text('Join Room', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w800, fontSize: 12)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.goldCoin,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
                 // Bottom Engagement Bar
                 Positioned(

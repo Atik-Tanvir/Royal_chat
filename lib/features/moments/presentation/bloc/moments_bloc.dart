@@ -387,6 +387,10 @@ class MomentsBloc extends Bloc<MomentsEvent, MomentsState> {
       mediaUrl: event.mediaUrl,
       caption: event.caption.trim(),
       bgGradientIndex: event.bgGradientIndex,
+      roomId: event.roomId,
+      roomTitle: event.roomTitle,
+      roomCategory: event.roomCategory,
+      roomOnlineCount: event.roomOnlineCount ?? 1,
       createdAt: now,
       expiresAt: now.add(const Duration(hours: 24)),
       viewsCount: 1,
@@ -395,7 +399,9 @@ class MomentsBloc extends Bloc<MomentsEvent, MomentsState> {
     final updatedStories = [story, ...state.stories];
     emit(state.copyWith(
       stories: updatedStories,
-      uiToastMessage: 'Your Story is now live for 24 hours!',
+      uiToastMessage: story.isRoomStory
+          ? '✨ Your Live Room is now featured on Stories!'
+          : 'Your Story is now live for 24 hours!',
       uiToastTick: state.uiToastTick + 1,
     ));
     await _repository.saveStories(updatedStories);

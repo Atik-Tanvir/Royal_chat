@@ -98,15 +98,31 @@ class CreateStoryEvent extends MomentsEvent {
   final String caption;
   final String? mediaUrl;
   final int bgGradientIndex;
+  final String? roomId;
+  final String? roomTitle;
+  final String? roomCategory;
+  final int? roomOnlineCount;
 
   const CreateStoryEvent({
     required this.caption,
     this.mediaUrl,
     this.bgGradientIndex = 0,
+    this.roomId,
+    this.roomTitle,
+    this.roomCategory,
+    this.roomOnlineCount,
   });
 
   @override
-  List<Object?> get props => [caption, mediaUrl, bgGradientIndex];
+  List<Object?> get props => [
+        caption,
+        mediaUrl,
+        bgGradientIndex,
+        roomId,
+        roomTitle,
+        roomCategory,
+        roomOnlineCount,
+      ];
 }
 
 class MarkStoryViewedEvent extends MomentsEvent {
