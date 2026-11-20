@@ -31,7 +31,12 @@ class LiveAudioRoomPage extends StatefulWidget {
   State<LiveAudioRoomPage> createState() => _LiveAudioRoomPageState();
 }
 
-class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
+class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> with TickerProviderStateMixin {
+  late AnimationController _waveController;
+  late AnimationController _pulseController;
+  bool _isVideoLiveMode = false;
+  int? _pendingSeatRequestIndex;
+  Timer? _seatRequestTimer;
   final LiveKitAudioService _audioService = LiveKitAudioService();
   bool _isConnectingAudio = false;
   bool _isAudioConnected = false;
@@ -60,6 +65,16 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
   @override
   void initState() {
     super.initState();
+    _waveController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat(reverse: true);
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+
     _seats = [
       {
         'index': 0,
@@ -68,7 +83,7 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
         'avatar': widget.room.hostAvatar,
         'isHost': true,
         'isMuted': false,
-        'isSpeaking': false,
+        'isSpeaking': true,
       },
       for (int i = 1; i < 8; i++)
         {
@@ -183,6 +198,51 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
               }
             },
           )
+          .onBroadcast(
+            event: 'seat_request',
+            callback: (payload) {
+              if (!mounted) return;
+              final user = payload['userName']?.toString() ?? 'User';
+              final sIdx = (payload['seatIndex'] as num?)?.toInt() ?? 0;
+              _displayGiftBanner('🙋 $user requested Mic Seat ${sIdx + 1}');
+              setState(() {
+                _messages.add({
+                  'sender': '📢 Request',
+                  'text': '$user requested Mic Seat ${sIdx + 1}',
+                });
+              });
+            },
+          )
+          .onBroadcast(
+            event: 'live_request',
+            callback: (payload) {
+              if (!mounted) return;
+              final user = payload['userName']?.toString() ?? 'User';
+              final type = payload['type']?.toString() ?? 'Co-Host';
+              _displayGiftBanner('📡 $user requested $type from Host!');
+              setState(() {
+                _messages.add({
+                  'sender': '📡 Live Request',
+                  'text': '$user requested $type',
+                });
+              });
+            },
+          )
+          .onBroadcast(
+            event: 'game_invite',
+            callback: (payload) {
+              if (!mounted) return;
+              final sender = payload['sender']?.toString() ?? 'Someone';
+              final game = payload['game']?.toString() ?? 'Game';
+              _displayGiftBanner('🎮 $sender invited everyone to $game!');
+              setState(() {
+                _messages.add({
+                  'sender': '🎮 Challenge',
+                  'text': '$sender invites all to $game! Tap Game icon to play!',
+                });
+              });
+            },
+          )
           .subscribe();
     } catch (e) {
       debugPrint('[LiveAudioRoom] Realtime subscription error: $e');
@@ -283,6 +343,9 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
 
   @override
   void dispose() {
+    _waveController.dispose();
+    _pulseController.dispose();
+    _seatRequestTimer?.cancel();
     _audioService.disconnect();
     if (_roomChannel != null) {
       SupabaseConfig.client.removeChannel(_roomChannel!);
@@ -634,6 +697,838 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
     );
   }
 
+
+  void _promptSeatOptions(int index) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        decoration: const BoxDecoration(
+          color: Color(0xFF07241C),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.mic, color: AppColors.gemEmerald, size: 22),
+                const SizedBox(width: 8),
+                Text(
+                  'Join Mic Seat ${index + 1}',
+                  style: AppTextStyles.titleBold.copyWith(color: AppColors.goldCoin),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Choose whether to request approval from Host or take seat directly:',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.caption.copyWith(color: Colors.white70),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accentOrange,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              icon: const Icon(Icons.send_rounded, size: 18),
+              label: const Text(
+                'Request Seat from Host (হোস্টকে রিকোয়েস্ট পাঠান)',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _sendSeatRequest(index);
+              },
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.gemCyan,
+                side: const BorderSide(color: AppColors.gemCyan, width: 1.2),
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              icon: const Icon(Icons.flash_on_rounded, size: 18),
+              label: const Text(
+                'Join Seat Directly (সরাসরি সিটে বসুন)',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _takeSeat(index);
+              },
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _sendSeatRequest(int index) {
+    final currentUserId = AuthSessionManager.currentUserId;
+    if (currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to request a mic seat!')),
+      );
+      return;
+    }
+
+    final profile = context.read<ProfileBloc>().state.profile;
+    final myName = profile.nickname.isNotEmpty ? profile.nickname : 'User';
+
+    setState(() => _pendingSeatRequestIndex = index);
+    _sendMessage('🙋 requested to join Mic Seat ${index + 1}');
+    _displayGiftBanner('⏳ Seat ${index + 1} request sent to ${widget.room.hostName}!');
+
+    _roomChannel?.sendBroadcastMessage(
+      event: 'seat_request',
+      payload: {
+        'seatIndex': index,
+        'userName': myName,
+        'userId': currentUserId,
+      },
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.hourglass_top_rounded, color: Colors.amber, size: 20),
+            const SizedBox(width: 8),
+            Text('Mic Seat ${index + 1} request sent! Waiting for Host approval ⏳'),
+          ],
+        ),
+        backgroundColor: const Color(0xFF0F382A),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    // Simulated host approval after 2.2 seconds for fluid localhost demonstration
+    _seatRequestTimer?.cancel();
+    _seatRequestTimer = Timer(const Duration(milliseconds: 2200), () {
+      if (mounted && _pendingSeatRequestIndex == index) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Text('🎉 ${widget.room.hostName} approved your Mic Seat ${index + 1} request!'),
+              ],
+            ),
+            backgroundColor: AppColors.gemEmerald,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        _takeSeat(index);
+        setState(() => _pendingSeatRequestIndex = null);
+      }
+    });
+  }
+
+  void _showLiveCoHostRequestModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        decoration: const BoxDecoration(
+          color: Color(0xFF07241C),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.sensors_rounded, color: Color(0xFF00F5D4), size: 24),
+                const SizedBox(width: 10),
+                Text(
+                  'Live Stage & Co-Host Requests',
+                  style: AppTextStyles.titleBold.copyWith(color: Colors.white),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Request ${widget.room.hostName} to join the live broadcast stage or PK battle:',
+              style: AppTextStyles.caption.copyWith(color: Colors.white70),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: const BorderSide(color: Colors.white12),
+              ),
+              tileColor: Colors.black26,
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFF8B5CF6),
+                child: Icon(Icons.videocam_rounded, color: Colors.white, size: 20),
+              ),
+              title: const Text(
+                'Request Video Co-Host (ভিডিও লাইভে ওঠার আবেদন)',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              subtitle: const Text(
+                'Broadcast live camera stream alongside Host',
+                style: TextStyle(color: Colors.white60, fontSize: 11),
+              ),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white38, size: 14),
+              onTap: () {
+                Navigator.pop(ctx);
+                _sendLiveCoHostRequest('Video Co-Host');
+              },
+            ),
+            const SizedBox(height: 10),
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: const BorderSide(color: Colors.white12),
+              ),
+              tileColor: Colors.black26,
+              leading: const CircleAvatar(
+                backgroundColor: AppColors.gemEmerald,
+                child: Icon(Icons.mic_rounded, color: Colors.white, size: 20),
+              ),
+              title: const Text(
+                'Request Audio Stage Co-Host (অডিও স্টেজে যোগ দিন)',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              subtitle: const Text(
+                'Speak live with HD audio on stage',
+                style: TextStyle(color: Colors.white60, fontSize: 11),
+              ),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white38, size: 14),
+              onTap: () {
+                Navigator.pop(ctx);
+                _sendLiveCoHostRequest('Audio Stage Co-Host');
+              },
+            ),
+            const SizedBox(height: 10),
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: const BorderSide(color: Colors.white12),
+              ),
+              tileColor: Colors.black26,
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFEF4444),
+                child: Icon(Icons.sports_kabaddi_rounded, color: Colors.white, size: 20),
+              ),
+              title: const Text(
+                'Challenge to 1v1 PK Duel (পিকে ব্যাটল চ্যালেঞ্জ)',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              subtitle: const Text(
+                'Compete in live gift war duel with Host',
+                style: TextStyle(color: Colors.white60, fontSize: 11),
+              ),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white38, size: 14),
+              onTap: () {
+                Navigator.pop(ctx);
+                _sendLiveCoHostRequest('1v1 PK Battle Challenge');
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _sendLiveCoHostRequest(String type) {
+    final profile = context.read<ProfileBloc>().state.profile;
+    final myName = profile.nickname.isNotEmpty ? profile.nickname : 'User';
+
+    _sendMessage('📡 sent a $type request to Host!');
+    _displayGiftBanner('📡 $type request sent to ${widget.room.hostName}!');
+
+    _roomChannel?.sendBroadcastMessage(
+      event: 'live_request',
+      payload: {
+        'userName': myName,
+        'type': type,
+      },
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.sensors_rounded, color: Color(0xFF00E5FF), size: 20),
+            const SizedBox(width: 8),
+            Text('$type request sent to ${widget.room.hostName}! Waiting for acceptance.'),
+          ],
+        ),
+        backgroundColor: const Color(0xFF0F382A),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+
+    // If video co-host, simulate approval and switch to video live stage after 2.5s
+    if (type.contains('Video')) {
+      Timer(const Duration(milliseconds: 2500), () {
+        if (mounted) {
+          setState(() => _isVideoLiveMode = true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.videocam_rounded, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Text('🎉 ${widget.room.hostName} approved your Video Co-Host request! Streaming live 📹'),
+                ],
+              ),
+              backgroundColor: AppColors.gemEmerald,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      });
+    } else if (type.contains('Audio')) {
+      Timer(const Duration(milliseconds: 2000), () {
+        if (mounted) {
+          // Take next empty guest seat (seats 1-7)
+          int emptyIndex = 1;
+          for (int i = 1; i < _seats.length; i++) {
+            if (_seats[i]['avatar'] == null) {
+              emptyIndex = i;
+              break;
+            }
+          }
+          _takeSeat(emptyIndex);
+        }
+      });
+    }
+  }
+
+  void _showGameOptionsModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        decoration: const BoxDecoration(
+          color: Color(0xFF07241C),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.gamepad_rounded, color: Color(0xFF8B5CF6), size: 24),
+                const SizedBox(width: 10),
+                Text(
+                  'Party Room Games & Challenges',
+                  style: AppTextStyles.titleBold.copyWith(color: Colors.white),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: const BorderSide(color: Colors.white12),
+              ),
+              tileColor: Colors.black26,
+              leading: const Text('🥣', style: TextStyle(fontSize: 26)),
+              title: const Text('Bucket Prediction Game (8 Items)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: const Text('Predict the winning item cycling from the magic bucket cauldron!', style: TextStyle(color: Colors.white60, fontSize: 11)),
+              trailing: const Icon(Icons.play_circle_fill_rounded, color: AppColors.gemEmerald, size: 24),
+              onTap: () {
+                Navigator.pop(ctx);
+                BucketPredictionGamePage.showGroupDrawer(
+                  context,
+                  roomId: widget.room.id,
+                  roomName: widget.room.title,
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: const BorderSide(color: Colors.white12),
+              ),
+              tileColor: Colors.black26,
+              leading: const Text('🏎️', style: TextStyle(fontSize: 26)),
+              title: const Text('Lucky Race Speed Challenge', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: const Text('High-speed racing game with live multiplayer odds', style: TextStyle(color: Colors.white60, fontSize: 11)),
+              trailing: const Icon(Icons.play_circle_fill_rounded, color: Color(0xFFFF5252), size: 24),
+              onTap: () {
+                Navigator.pop(ctx);
+                LuckyRaceGameDrawer.show(
+                  context,
+                  onRechargeTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const CoinsWalletPage()),
+                    );
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: const BorderSide(color: AppColors.goldCoin),
+              ),
+              tileColor: AppColors.goldCoin.withValues(alpha: 0.12),
+              leading: const Text('📢', style: TextStyle(fontSize: 26)),
+              title: const Text('Invite Room to Play Game (গেমে রিকোয়েস্ট পাঠান)', style: TextStyle(color: AppColors.goldCoin, fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: const Text('Broadcast game invitation to everyone in the room', style: TextStyle(color: Colors.white70, fontSize: 11)),
+              trailing: const Icon(Icons.send_rounded, color: AppColors.goldCoin, size: 20),
+              onTap: () {
+                Navigator.pop(ctx);
+                _broadcastGameChallenge('Bucket Prediction Game');
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _broadcastGameChallenge(String gameName) {
+    final profile = context.read<ProfileBloc>().state.profile;
+    final myName = profile.nickname.isNotEmpty ? profile.nickname : 'User';
+
+    _sendMessage('🎮 challenged everyone to play $gameName! Tap Game icon to play together!');
+    _displayGiftBanner('🎮 $myName invited everyone to $gameName!');
+
+    _roomChannel?.sendBroadcastMessage(
+      event: 'game_invite',
+      payload: {
+        'sender': myName,
+        'game': gameName,
+      },
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.sports_esports_rounded, color: AppColors.goldCoin, size: 20),
+            const SizedBox(width: 8),
+            Text('Game challenge broadcasted to room! Starting $gameName...'),
+          ],
+        ),
+        backgroundColor: const Color(0xFF0F382A),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    BucketPredictionGamePage.showGroupDrawer(
+      context,
+      roomId: widget.room.id,
+      roomName: widget.room.title,
+    );
+  }
+
+  Widget _buildLiveStage() {
+    if (_isVideoLiveMode) {
+      return _buildVideoLiveStage();
+    }
+    return _buildAudioLiveStage();
+  }
+
+  Widget _buildAudioLiveStage() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AppColors.gemEmerald.withValues(alpha: 0.35),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.gemEmerald.withValues(alpha: 0.1),
+            blurRadius: 10,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          AnimatedBuilder(
+            animation: _pulseController,
+            builder: (context, child) {
+              return Container(
+                padding: const EdgeInsets.all(2.5),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: SweepGradient(
+                    colors: const [
+                      AppColors.gemEmerald,
+                      AppColors.goldCoin,
+                      Colors.cyanAccent,
+                      AppColors.gemEmerald,
+                    ],
+                    transform: GradientRotation(_pulseController.value * 6.28),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.gemEmerald.withValues(alpha: 0.4 * _pulseController.value),
+                      blurRadius: 8 * _pulseController.value,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                child: CustomAvatar(
+                  imageUrl: widget.room.hostAvatar,
+                  radius: 20,
+                  hasVipFrame: true,
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        widget.room.hostName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: AppColors.goldCoin,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'HOST',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    AnimatedBuilder(
+                      animation: _pulseController,
+                      builder: (context, child) {
+                        return Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.redAccent.withValues(
+                              alpha: 0.5 + 0.5 * _pulseController.value,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.redAccent.withValues(alpha: 0.6),
+                                blurRadius: 4,
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 5),
+                    const Text(
+                      'LIVE ON-AIR',
+                      style: TextStyle(
+                        color: Color(0xFF00E676),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    AnimatedBuilder(
+                      animation: _waveController,
+                      builder: (context, child) {
+                        final val = _waveController.value;
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildEqBar(8 + val * 10, AppColors.gemEmerald),
+                            const SizedBox(width: 2),
+                            _buildEqBar(5 + (1 - val) * 12, AppColors.gemCyan),
+                            const SizedBox(width: 2),
+                            _buildEqBar(12 + val * 8, AppColors.goldCoin),
+                            const SizedBox(width: 2),
+                            _buildEqBar(7 + (1 - val) * 12, AppColors.gemEmerald),
+                            const SizedBox(width: 2),
+                            _buildEqBar(10 + val * 6, AppColors.accentOrange),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              setState(() => _isVideoLiveMode = true);
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)],
+                ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.purple.withValues(alpha: 0.3),
+                    blurRadius: 6,
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.videocam_rounded, color: Colors.white, size: 14),
+                  SizedBox(width: 4),
+                  Text(
+                    'Watch Video',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVideoLiveStage() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      height: 180,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const RadialGradient(
+          center: Alignment(0, -0.2),
+          radius: 1.2,
+          colors: [
+            Color(0xFF1E3A8A),
+            Color(0xFF0F172A),
+            Color(0xFF020617),
+          ],
+        ),
+        border: Border.all(
+          color: const Color(0xFF60A5FA).withValues(alpha: 0.4),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blueAccent.withValues(alpha: 0.25),
+            blurRadius: 16,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedBuilder(
+                  animation: _pulseController,
+                  builder: (context, child) {
+                    return Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.cyanAccent.withValues(
+                            alpha: 0.4 + 0.6 * _pulseController.value,
+                          ),
+                          width: 2.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.cyanAccent.withValues(alpha: 0.3),
+                            blurRadius: 14,
+                          ),
+                        ],
+                      ),
+                      child: CustomAvatar(
+                        imageUrl: widget.room.hostAvatar,
+                        radius: 34,
+                        hasVipFrame: true,
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.room.hostName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const RoyalBrandLogo(size: 16),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                AnimatedBuilder(
+                  animation: _waveController,
+                  builder: (context, child) {
+                    final val = _waveController.value;
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildEqBar(8 + val * 10, Colors.cyanAccent),
+                        const SizedBox(width: 3),
+                        _buildEqBar(12 + (1 - val) * 8, Colors.greenAccent),
+                        const SizedBox(width: 3),
+                        _buildEqBar(9 + val * 12, Colors.amberAccent),
+                        const SizedBox(width: 3),
+                        _buildEqBar(15 + (1 - val) * 6, Colors.pinkAccent),
+                        const SizedBox(width: 3),
+                        _buildEqBar(8 + val * 8, Colors.cyanAccent),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            top: 10,
+            left: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withValues(alpha: 0.85),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.videocam, color: Colors.white, size: 12),
+                  SizedBox(width: 4),
+                  Text(
+                    'LIVE 1080p',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: 10,
+            right: 12,
+            child: GestureDetector(
+              onTap: () {
+                setState(() => _isVideoLiveMode = false);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white30, width: 0.8),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.mic, color: Colors.white70, size: 12),
+                    SizedBox(width: 4),
+                    Text(
+                      'Audio Mode',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEqBar(double height, Color color) {
+    return Container(
+      width: 2.5,
+      height: height.clamp(4.0, 22.0),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -658,8 +1553,9 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
             child: Column(
               children: [
                 _buildHeader(),
-                _buildPkBattleBar(),
-                const SizedBox(height: 8),
+                if (widget.room.category == 'PK') _buildPkBattleBar(),
+                _buildLiveStage(),
+                const SizedBox(height: 4),
                 _buildSeatsGrid(),
                 const Spacer(),
                 if (_activeGiftBanner != null) _buildGiftBanner(),
@@ -841,19 +1737,67 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
             ),
           ),
           GestureDetector(
-            onTap: () => setState(() => _isFollowing = !_isFollowing),
+            onTap: () {
+              if (!_isFollowing) {
+                setState(() => _isFollowing = true);
+                _sendMessage('❤️ followed Host ${widget.room.hostName}!');
+                _displayGiftBanner('❤️ You are now following ${widget.room.hostName}!');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        const Icon(Icons.favorite, color: Colors.pinkAccent, size: 20),
+                        const SizedBox(width: 8),
+                        Text('You followed ${widget.room.hostName}! 💖'),
+                      ],
+                    ),
+                    backgroundColor: AppColors.primaryGreen,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              } else {
+                setState(() => _isFollowing = false);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('You unfollowed ${widget.room.hostName}.'),
+                    duration: const Duration(seconds: 1),
+                  ),
+                );
+              }
+            },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: _isFollowing ? Colors.white24 : AppColors.accentOrange,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                _isFollowing ? 'Joined' : '+ Follow',
-                style: AppTextStyles.caption.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+                gradient: LinearGradient(
+                  colors: _isFollowing
+                      ? const [AppColors.gemEmerald, Color(0xFF059669)]
+                      : const [Color(0xFFFF7A00), Color(0xFFFF5252)],
                 ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: (_isFollowing ? AppColors.gemEmerald : AppColors.accentOrange).withValues(alpha: 0.4),
+                    blurRadius: 6,
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isFollowing ? Icons.check_circle_rounded : Icons.favorite_rounded,
+                    color: Colors.white,
+                    size: 13,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _isFollowing ? 'Following' : '+ Follow',
+                    style: AppTextStyles.caption.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -936,7 +1880,16 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
                   },
                 );
               } else {
-                _takeSeat(index);
+                if (_pendingSeatRequestIndex == index) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Your seat request is pending host approval ⏳'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                } else {
+                  _promptSeatOptions(index);
+                }
               }
             },
             child: Column(
@@ -966,23 +1919,38 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
                             radius: 24,
                             hasVipFrame: seat['isHost'] as bool,
                           )
-                        : Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white.withValues(alpha: 0.1),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                width: 1.5,
+                        : _pendingSeatRequestIndex == index
+                            ? Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppColors.accentOrange.withValues(alpha: 0.2),
+                                  border: Border.all(color: AppColors.goldCoin, width: 2),
+                                ),
+                                child: const Icon(
+                                  Icons.hourglass_top_rounded,
+                                  color: AppColors.goldCoin,
+                                  size: 22,
+                                ),
+                              )
+                            : Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withValues(alpha: 0.1),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.add,
+                                  color: Colors.white70,
+                                  size: 22,
+                                ),
                               ),
-                            ),
-                            child: const Icon(
-                              Icons.add,
-                              color: Colors.white70,
-                              size: 22,
-                            ),
-                          ),
                     if (isOccupied && isMuted)
                       Positioned(
                         bottom: -2,
@@ -1023,7 +1991,9 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  isOccupied ? (seat['name'] ?? 'Guest') : '${index + 1}',
+                  isOccupied
+                      ? (seat['name'] ?? 'Guest')
+                      : (_pendingSeatRequestIndex == index ? 'Pending...' : '${index + 1}'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.caption.copyWith(
@@ -1160,6 +2130,14 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
           ),
           const SizedBox(width: 10),
 
+          // Join Live / Co-Host Request button
+          _buildCircleAction(
+            icon: Icons.sensors_rounded,
+            color: const Color(0xFF00F5D4),
+            onTap: _showLiveCoHostRequestModal,
+          ),
+          const SizedBox(width: 6),
+
           // Mic toggle
           _buildCircleAction(
             icon: _isMicMuted ? Icons.mic_off : Icons.mic,
@@ -1167,34 +2145,12 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> {
             onTap: _toggleMic,
           ),
           const SizedBox(width: 6),
-          // 8-Item Bucket Group Game trigger
+
+          // Game and Challenge Hub
           _buildCircleAction(
             icon: Icons.gamepad_rounded,
             color: const Color(0xFF8B5CF6),
-            onTap: () {
-              BucketPredictionGamePage.showGroupDrawer(
-                context,
-                roomId: widget.room.id,
-                roomName: widget.room.title,
-              );
-            },
-          ),
-          const SizedBox(width: 6),
-          // Lucky Race Mini-game trigger
-          _buildCircleAction(
-            icon: Icons.sports_score_rounded,
-            color: const Color(0xFFFF5252),
-            onTap: () {
-              LuckyRaceGameDrawer.show(
-                context,
-                onRechargeTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const CoinsWalletPage()),
-                  );
-                },
-              );
-            },
+            onTap: _showGameOptionsModal,
           ),
           const SizedBox(width: 6),
 
