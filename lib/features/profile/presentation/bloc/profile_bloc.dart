@@ -246,6 +246,12 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     WithdrawGemsEvent event,
     Emitter<ProfileState> emit,
   ) async {
+    // Minimum threshold: 5,000 gems ($5.00 USD)
+    if (event.gems < 5000) {
+      debugPrint('[ProfileBloc] Withdrawal rejected: Minimum is 5,000 gems (\$5.00 USD)');
+      return;
+    }
+
     if (state.profile.gemBalance >= event.gems) {
       final newGems = state.profile.gemBalance - event.gems;
       final updatedProfile = _cloneProfileWith(gemBalance: newGems);
@@ -257,9 +263,10 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         }).eq('id', state.profile.userId);
 
         final withdrawalId = 'WD-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-        final gatewayInfo = event.accountNumber.isNotEmpty
-            ? '${event.gateway} (${event.accountNumber})'
-            : event.gateway;
+        final countryLabel = event.country == 'IN' ? '🇮🇳 India' : '🇧🇩 Bangladesh';
+        final nameInfo = event.accountName.trim().isNotEmpty ? ' [Name: ${event.accountName.trim()}]' : '';
+        final fullAccount = '${event.accountNumber.trim()}$nameInfo';
+        final gatewayInfo = '${event.gateway} ($countryLabel)';
 
         await SupabaseConfig.client.from('withdrawals').insert({
           'id': withdrawalId,
@@ -267,7 +274,8 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
           'user_name': state.profile.nickname,
           'user_avatar': state.profile.avatarUrl,
           'gateway': gatewayInfo,
-          'amount': event.gems / 1000,
+          'account_number': fullAccount,
+          'amount': event.gems / 1000.0,
           'gems': event.gems.toInt(),
           'status': 'Pending',
         });
@@ -276,7 +284,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
           id: withdrawalId,
           userId: state.profile.userId,
           type: 'withdrawal',
-          title: 'Withdrawal to $gatewayInfo',
+          title: 'Withdrawal to $gatewayInfo ($fullAccount)',
           amount: event.gems,
           currency: 'gem',
           status: 'Pending',

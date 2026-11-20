@@ -30,15 +30,19 @@ class WithdrawGemsEvent extends ProfileEvent {
   final double gems;
   final String gateway;
   final String accountNumber;
+  final String accountName;
+  final String country;
 
   const WithdrawGemsEvent(
     this.gems, {
     this.gateway = 'bKash',
     this.accountNumber = '',
+    this.accountName = '',
+    this.country = 'BD',
   });
 
   @override
-  List<Object?> get props => [gems, gateway, accountNumber];
+  List<Object?> get props => [gems, gateway, accountNumber, accountName, country];
 }
 
 class ConvertGemsToCoinsEvent extends ProfileEvent {

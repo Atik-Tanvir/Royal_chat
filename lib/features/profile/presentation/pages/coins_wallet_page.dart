@@ -409,15 +409,55 @@ class _PaymentCheckoutSheet extends StatefulWidget {
 }
 
 class _PaymentCheckoutSheetState extends State<_PaymentCheckoutSheet> {
+  String _selectedCountry = 'BD'; // 'BD' or 'IN'
   String _selectedMethod = 'bKash';
   bool _isProcessing = false;
+  final TextEditingController _senderController = TextEditingController();
+  final TextEditingController _trxIdController = TextEditingController();
 
-  final List<Map<String, String>> _methods = [
-    {'name': 'bKash', 'icon': '📱', 'desc': 'Instant Mobile Recharge'},
-    {'name': 'Nagad', 'icon': '⚡', 'desc': 'Fast Digital Wallet'},
-    {'name': 'Google Play', 'icon': '💳', 'desc': 'Official In-App Purchase'},
-    {'name': 'USDT (TRC20)', 'icon': '🪙', 'desc': 'Instant Crypto Settlement'},
-  ];
+  @override
+  void dispose() {
+    _senderController.dispose();
+    _trxIdController.dispose();
+    super.dispose();
+  }
+
+  final Map<String, List<Map<String, String>>> _countryMethods = {
+    'BD': [
+      {
+        'name': 'bKash',
+        'icon': '📱',
+        'desc': 'Send Money to Admin Personal',
+        'adminNumber': '01812345678',
+      },
+      {
+        'name': 'Nagad',
+        'icon': '⚡',
+        'desc': 'Send Money to Admin Personal',
+        'adminNumber': '01912345678',
+      },
+    ],
+    'IN': [
+      {
+        'name': 'Google Pay',
+        'icon': '💳',
+        'desc': 'Instant GPay / UPI Transfer',
+        'adminNumber': 'gamegala.pay@oksbi',
+      },
+      {
+        'name': 'Paytm',
+        'icon': '💰',
+        'desc': 'Paytm Wallet or UPI Transfer',
+        'adminNumber': 'gamegala.pay@paytm',
+      },
+      {
+        'name': 'PhonePe',
+        'icon': '🟣',
+        'desc': 'PhonePe UPI Direct Transfer',
+        'adminNumber': 'gamegala.pay@ybl',
+      },
+    ],
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -425,183 +465,362 @@ class _PaymentCheckoutSheetState extends State<_PaymentCheckoutSheet> {
     final bonus = widget.pkg['bonus'] as String;
     final price = widget.pkg['price'] as String;
     final rawAmount = widget.pkg['raw'] as double;
+    final methods = _countryMethods[_selectedCountry]!;
+    final selectedMethodData = methods.firstWhere(
+      (m) => m['name'] == _selectedMethod,
+      orElse: () => methods.first,
+    );
 
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Select Payment Method',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close, color: Colors.grey),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Package Details Card
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFFBEB),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.goldCoin.withValues(alpha: 0.4)),
-            ),
-            child: Row(
+    return SingleChildScrollView(
+      child: Container(
+        padding: EdgeInsets.only(
+          left: 22,
+          right: 22,
+          top: 22,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 22,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.monetization_on, color: AppColors.goldCoin, size: 28),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '$coins Coins',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
-                        Text(
-                          bonus,
-                          style: const TextStyle(color: Color(0xFFE11D48), fontSize: 12, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                Text(
-                  price,
-                  style: const TextStyle(
+                const Text(
+                  'Top-up Payment',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                     color: Color(0xFF1E293B),
-                    fontWeight: FontWeight.w900,
-                    fontSize: 20,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.grey),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Package Details Card
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.goldCoin.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.monetization_on, color: AppColors.goldCoin, size: 28),
+                      const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$coins Coins',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                          Text(
+                            bonus,
+                            style: const TextStyle(color: Color(0xFFE11D48), fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  Text(
+                    price,
+                    style: const TextStyle(
+                      color: Color(0xFF1E293B),
+                      fontWeight: FontWeight.w900,
+                      fontSize: 20,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Country Selector Tab
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedCountry = 'BD';
+                        _selectedMethod = 'bKash';
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _selectedCountry == 'BD' ? const Color(0xFF16A34A).withValues(alpha: 0.1) : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _selectedCountry == 'BD' ? const Color(0xFF16A34A) : Colors.grey.shade300,
+                        ),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          '🇧🇩 Bangladesh',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedCountry = 'IN';
+                        _selectedMethod = 'Google Pay';
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _selectedCountry == 'IN' ? const Color(0xFF16A34A).withValues(alpha: 0.1) : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _selectedCountry == 'IN' ? const Color(0xFF16A34A) : Colors.grey.shade300,
+                        ),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          '🇮🇳 India',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
-          // Payment Methods
-          ...List.generate(_methods.length, (i) {
-            final m = _methods[i];
-            final isSel = _selectedMethod == m['name'];
+            // Payment Methods List
+            ...List.generate(methods.length, (i) {
+              final m = methods[i];
+              final isSel = _selectedMethod == m['name'];
 
-            return GestureDetector(
-              onTap: () => setState(() => _selectedMethod = m['name']!),
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: isSel ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: isSel ? const Color(0xFF16A34A) : Colors.grey.shade200,
-                    width: isSel ? 1.5 : 1,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Text(m['icon']!, style: const TextStyle(fontSize: 20)),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            m['name']!,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                          ),
-                          Text(
-                            m['desc']!,
-                            style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
-                          ),
-                        ],
-                      ),
+              return GestureDetector(
+                onTap: () => setState(() => _selectedMethod = m['name']!),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isSel ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSel ? const Color(0xFF16A34A) : Colors.grey.shade200,
+                      width: isSel ? 1.5 : 1,
                     ),
-                    if (isSel)
-                      const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 20),
-                  ],
-                ),
-              ),
-            );
-          }),
-          const SizedBox(height: 20),
-
-          // Pay Button
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF16A34A),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              elevation: 2,
-            ),
-            onPressed: _isProcessing
-                ? null
-                : () async {
-                    setState(() => _isProcessing = true);
-                    await Future.delayed(const Duration(milliseconds: 600));
-
-                    if (!context.mounted) return;
-
-                    context.read<ProfileBloc>().add(
-                          RechargeCoinsEvent(
-                            rawAmount,
-                            gateway: _selectedMethod,
-                            packageTitle: 'Top-up $coins Coins ($price)',
-                          ),
-                        );
-
-                    Navigator.pop(context);
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('✨ Payment successful! Recharged $coins coins via $_selectedMethod.'),
-                        backgroundColor: AppColors.gemEmerald,
-                        action: SnackBarAction(
-                          label: 'View History',
-                          textColor: Colors.white,
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const WalletTransactionsPage(initialTabIndex: 1),
-                              ),
-                            );
-                          },
+                  ),
+                  child: Row(
+                    children: [
+                      Text(m['icon']!, style: const TextStyle(fontSize: 20)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              m['name']!,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                            Text(
+                              m['desc']!,
+                              style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                            ),
+                          ],
                         ),
                       ),
-                    );
-                  },
-            child: _isProcessing
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                  )
-                : Text(
-                    'Pay $price & Add Coins',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      if (isSel)
+                        const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 20),
+                    ],
                   ),
-          ),
-        ],
+                ),
+              );
+            }),
+            const SizedBox(height: 8),
+
+            // Official Admin Recipient Card
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Send $price to Official Admin $_selectedMethod:',
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF475569)),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        selectedMethodData['adminNumber'] ?? '',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF0F172A),
+                      elevation: 0,
+                      side: BorderSide(color: Colors.grey.shade300),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      minimumSize: Size.zero,
+                    ),
+                    icon: const Icon(Icons.copy_rounded, size: 14),
+                    label: const Text('Copy', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    onPressed: () {
+                      final numToCopy = selectedMethodData['adminNumber'] ?? '';
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Copied $numToCopy to clipboard!')),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Sender Phone / UPI
+            TextField(
+              controller: _senderController,
+              decoration: InputDecoration(
+                labelText: _selectedCountry == 'BD'
+                    ? 'Your Sender $_selectedMethod Number (11 digits)'
+                    : 'Your Sender Phone / UPI ID',
+                labelStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                hintText: _selectedCountry == 'BD' ? '01XXXXXXXXX' : '9876543210 or yourname@upi',
+                hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Transaction ID
+            TextField(
+              controller: _trxIdController,
+              decoration: InputDecoration(
+                labelText: 'Transaction ID / Reference (TrxID)',
+                labelStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                hintText: 'e.g. 9J87AK29 or UPI Ref number',
+                hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Pay Button
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF16A34A),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 2,
+              ),
+              onPressed: _isProcessing
+                  ? null
+                  : () async {
+                      final sender = _senderController.text.trim();
+                      final trxId = _trxIdController.text.trim();
+
+                      if (sender.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please enter your sender mobile number or UPI ID'),
+                            backgroundColor: Colors.redAccent,
+                          ),
+                        );
+                        return;
+                      }
+
+                      if (trxId.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please enter payment Transaction ID (TrxID)'),
+                            backgroundColor: Colors.redAccent,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setState(() => _isProcessing = true);
+                      await Future.delayed(const Duration(milliseconds: 600));
+
+                      if (!context.mounted) return;
+
+                      final countryLabel = _selectedCountry == 'BD' ? '🇧🇩 BD' : '🇮🇳 IN';
+                      context.read<ProfileBloc>().add(
+                            RechargeCoinsEvent(
+                              rawAmount,
+                              gateway: '$_selectedMethod ($countryLabel - Sender: $sender, Trx: $trxId)',
+                              packageTitle: 'Top-up $coins Coins ($price)',
+                            ),
+                          );
+
+                      Navigator.pop(context);
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('✨ Top-up submitted! Recharged $coins coins via $_selectedMethod.'),
+                          backgroundColor: AppColors.gemEmerald,
+                          action: SnackBarAction(
+                            label: 'View History',
+                            textColor: Colors.white,
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const WalletTransactionsPage(initialTabIndex: 1),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
+              child: _isProcessing
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : Text(
+                      'Confirm Payment & Add $coins Coins',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
