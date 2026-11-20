@@ -685,34 +685,7 @@ class _PartyTabPageState extends State<PartyTabPage> {
             bottom: 16,
             child: Center(
               child: GestureDetector(
-                onTap: () {
-                  RoomRestrictionDialog.show(
-                    context,
-                    onJoinHotRoom: () {
-                      final rooms = context.read<PartyBloc>().state.allRooms;
-                      if (rooms.isNotEmpty) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => LiveAudioRoomPage(room: rooms.first),
-                          ),
-                        );
-                      }
-                    },
-                    onBypassCreate: () {
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => CreateRoomDialog(
-                          onCreate: (title, category) {
-                            context.read<PartyBloc>().add(
-                                  CreateNewRoomEvent(title: title, category: category),
-                                );
-                          },
-                        ),
-                      );
-                    },
-                  );
-                },
+                onTap: () => _openCreateRoomModal(context),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 13),
                   decoration: BoxDecoration(
@@ -934,6 +907,46 @@ class _PartyTabPageState extends State<PartyTabPage> {
       context,
       MaterialPageRoute(
         builder: (_) => LiveAudioRoomPage(room: hostRoom),
+      ),
+    );
+  }
+
+  void _openCreateRoomModal(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => CreateRoomDialog(
+        onCreate: (title, category) {
+          final profile = context.read<ProfileBloc>().state.profile;
+          final myName = profile.nickname.isNotEmpty ? profile.nickname : 'Host';
+          final myAvatar = profile.avatarUrl.isNotEmpty
+              ? profile.avatarUrl
+              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
+          final myFlag = profile.countryFlag.isNotEmpty ? profile.countryFlag : '🇧🇩';
+
+          final newRoom = PartyRoom(
+            id: 'room_${DateTime.now().millisecondsSinceEpoch}',
+            title: title.trim().isNotEmpty ? title.trim() : '$myName\'s Party Arena',
+            hostName: myName,
+            hostAvatar: myAvatar,
+            countryFlag: myFlag,
+            onlineCount: 1,
+            category: category,
+            seatedAvatars: [myAvatar],
+            isLive: true,
+          );
+
+          context.read<PartyBloc>().add(
+                CreateNewRoomEvent(title: newRoom.title, category: newRoom.category),
+              );
+
+          // Direct Navigation into the created room!
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => LiveAudioRoomPage(room: newRoom),
+            ),
+          );
+        },
       ),
     );
   }

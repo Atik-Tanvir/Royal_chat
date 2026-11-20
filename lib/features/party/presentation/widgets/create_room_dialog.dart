@@ -126,8 +126,8 @@ class _CreateRoomDialogState extends State<CreateRoomDialog> {
               onPressed: () {
                 final title = _titleController.text.trim();
                 if (title.isNotEmpty) {
-                  widget.onCreate(title, _selectedCategory);
                   Navigator.pop(context);
+                  widget.onCreate(title, _selectedCategory);
                 }
               },
               child: Text(

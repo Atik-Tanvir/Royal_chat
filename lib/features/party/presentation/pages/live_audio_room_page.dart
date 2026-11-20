@@ -47,6 +47,16 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> with TickerProvid
   String? _activeGiftBanner;
   Timer? _giftBannerTimer;
 
+  // PK Battle State
+  bool _isPkBattleActive = false;
+  int _pkSecondsLeft = 300;
+  Timer? _pkTimer;
+  int _blueScore = 450;
+  int _redScore = 720;
+
+  // Host Stage Request Approval State
+  Map<String, dynamic>? _incomingSeatRequest;
+
   // 8 seats: Index 0 is Host, Indices 1-7 are Guests
   late List<Map<String, dynamic>> _seats;
   RealtimeChannel? _roomChannel;
@@ -60,6 +70,14 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> with TickerProvid
       if (uid.isNotEmpty) return uid;
     }
     return '';
+  }
+
+  bool get _isHost {
+    final profile = context.read<ProfileBloc>().state.profile;
+    if (_mySeatIndex == 0) return true;
+    if (widget.room.hostName.toLowerCase() == profile.nickname.toLowerCase()) return true;
+    if (_hostUserId.isNotEmpty && AuthSessionManager.currentUserId == _hostUserId) return true;
+    return false;
   }
 
   @override
@@ -97,6 +115,11 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> with TickerProvid
         },
     ];
 
+    if (widget.room.category == 'PK') {
+      _isPkBattleActive = true;
+      _startPkTimer();
+    }
+
     _messages.add({
       'sender': 'System',
       'text': 'Welcome to ${widget.room.title}! Live WebRTC audio connected.',
@@ -105,6 +128,37 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> with TickerProvid
     _initLiveKit();
     _loadSeatsFromSupabase();
     _initRealtimeSubscription();
+  }
+
+  void _togglePkBattle() {
+    setState(() {
+      _isPkBattleActive = !_isPkBattleActive;
+      if (_isPkBattleActive) {
+        _pkSecondsLeft = 300;
+        _startPkTimer();
+        _sendMessage('⚔️ Host started a 5-minute 1v1 PK Duel Battle! Send gifts to support!');
+        _displayGiftBanner('⚔️ 1v1 PK Duel Started! 05:00 Time War!');
+      } else {
+        _pkTimer?.cancel();
+        _sendMessage('🏁 PK Battle concluded!');
+        _displayGiftBanner('🏁 PK Battle concluded!');
+      }
+    });
+  }
+
+  void _startPkTimer() {
+    _pkTimer?.cancel();
+    _pkTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (_pkSecondsLeft > 0) {
+        if (mounted) setState(() => _pkSecondsLeft--);
+      } else {
+        t.cancel();
+        if (mounted) {
+          setState(() => _isPkBattleActive = false);
+          _sendMessage('🏁 PK Battle Time is UP! Winner: ${_redScore >= _blueScore ? "RED Team" : "BLUE Team"}! 🏆');
+        }
+      }
+    });
   }
 
   Future<void> _loadSeatsFromSupabase() async {
@@ -204,13 +258,41 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> with TickerProvid
               if (!mounted) return;
               final user = payload['userName']?.toString() ?? 'User';
               final sIdx = (payload['seatIndex'] as num?)?.toInt() ?? 0;
+              final uid = payload['userId']?.toString() ?? '';
+              final avatar = payload['avatar']?.toString() ?? '';
               _displayGiftBanner('🙋 $user requested Mic Seat ${sIdx + 1}');
               setState(() {
+                _incomingSeatRequest = {
+                  'user': user,
+                  'seatIndex': sIdx,
+                  'userId': uid,
+                  'avatar': avatar,
+                };
                 _messages.add({
                   'sender': '📢 Request',
                   'text': '$user requested Mic Seat ${sIdx + 1}',
                 });
               });
+            },
+          )
+          .onBroadcast(
+            event: 'seat_approved',
+            callback: (payload) {
+              if (!mounted) return;
+              final sIdx = (payload['seatIndex'] as num?)?.toInt() ?? 0;
+              final uid = payload['userId']?.toString() ?? '';
+              final uName = payload['userName']?.toString() ?? 'User';
+              if (uid == AuthSessionManager.currentUserId) {
+                _takeSeat(sIdx);
+              } else {
+                setState(() {
+                  if (sIdx >= 0 && sIdx < _seats.length) {
+                    _seats[sIdx]['userId'] = uid;
+                    _seats[sIdx]['name'] = uName;
+                    _seats[sIdx]['isSpeaking'] = true;
+                  }
+                });
+              }
             },
           )
           .onBroadcast(
@@ -353,6 +435,7 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> with TickerProvid
     }
     _msgController.dispose();
     _giftBannerTimer?.cancel();
+    _pkTimer?.cancel();
     super.dispose();
   }
 
@@ -1553,10 +1636,12 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> with TickerProvid
             child: Column(
               children: [
                 _buildHeader(),
-                if (widget.room.category == 'PK') _buildPkBattleBar(),
+                if (_isPkBattleActive || widget.room.category == 'PK') _buildPkBattleBar(),
                 _buildLiveStage(),
                 const SizedBox(height: 4),
                 _buildSeatsGrid(),
+                if (_incomingSeatRequest != null && _isHost) _buildIncomingRequestBanner(),
+                if (_isHost) _buildHostQuickToolsBar(),
                 const Spacer(),
                 if (_activeGiftBanner != null) _buildGiftBanner(),
                 _buildChatArea(),
@@ -1570,6 +1655,10 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> with TickerProvid
   }
 
   Widget _buildPkBattleBar() {
+    final mins = _pkSecondsLeft ~/ 60;
+    final secs = _pkSecondsLeft % 60;
+    final timeStr = '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -1591,9 +1680,9 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> with TickerProvid
           // Blue team
           const Icon(Icons.shield, color: Color(0xFF60A5FA), size: 16),
           const SizedBox(width: 4),
-          const Text(
-            'BLUE 450',
-            style: TextStyle(
+          Text(
+            'BLUE $_blueScore',
+            style: const TextStyle(
               color: Color(0xFF93C5FD),
               fontSize: 11,
               fontWeight: FontWeight.w800,
@@ -1601,39 +1690,42 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> with TickerProvid
           ),
           const Spacer(),
           // Center PK Timer
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFD700),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'PK ',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
+          GestureDetector(
+            onTap: _isHost ? _togglePkBattle : null,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFD700),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    '⚔️ PK ',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
-                ),
-                Text(
-                  '04:30',
-                  style: TextStyle(
-                    color: Colors.black87,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
+                  Text(
+                    timeStr,
+                    style: const TextStyle(
+                      color: Colors.black87,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const Spacer(),
           // Red team
-          const Text(
-            '720 RED',
-            style: TextStyle(
+          Text(
+            '$_redScore RED',
+            style: const TextStyle(
               color: Color(0xFFFCA5A5),
               fontSize: 11,
               fontWeight: FontWeight.w800,
@@ -1643,6 +1735,233 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> with TickerProvid
           const Icon(Icons.shield, color: Color(0xFFF87171), size: 16),
         ],
       ),
+    );
+  }
+
+  Widget _buildHostQuickToolsBar() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D281E).withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primaryGreen.withValues(alpha: 0.4), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.4),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          // 1. PK Duel Toggle
+          _buildHostToolItem(
+            icon: Icons.sports_mma_rounded,
+            label: _isPkBattleActive ? 'End PK' : '⚔️ PK Duel',
+            color: _isPkBattleActive ? Colors.redAccent : const Color(0xFFFF5252),
+            onTap: _togglePkBattle,
+          ),
+          // 2. Start Game
+          _buildHostToolItem(
+            icon: Icons.sports_esports_rounded,
+            label: '🎮 Play Game',
+            color: const Color(0xFF8B5CF6),
+            onTap: _showGameOptionsModal,
+          ),
+          // 3. Audio/Video Mode
+          _buildHostToolItem(
+            icon: Icons.videocam_rounded,
+            label: _isVideoLiveMode ? '🎙️ Audio Live' : '📹 Video Live',
+            color: const Color(0xFF06B6D4),
+            onTap: () {
+              setState(() => _isVideoLiveMode = !_isVideoLiveMode);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(_isVideoLiveMode
+                      ? '📹 Camera Live Mode Active! Streaming audio + HD video feed.'
+                      : '🎙️ Switched to Audio Party Room stage.'),
+                  backgroundColor: const Color(0xFF0F382A),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+              _sendMessage(_isVideoLiveMode
+                  ? '📹 Host switched stream to Live HD Video mode!'
+                  : '🎙️ Host switched stream to Audio Room mode!');
+            },
+          ),
+          // 4. Lock/Unlock Seats
+          _buildHostToolItem(
+            icon: Icons.lock_outline_rounded,
+            label: '🔒 Seat Lock',
+            color: AppColors.goldCoin,
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('🔒 Seat Lock Active: Listeners must request Host permission to mic!'),
+                  backgroundColor: Color(0xFF0F382A),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHostToolItem({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+                border: Border.all(color: color.withValues(alpha: 0.6), width: 1),
+              ),
+              child: Icon(icon, color: color, size: 16),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.9),
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIncomingRequestBanner() {
+    final req = _incomingSeatRequest;
+    if (req == null) return const SizedBox.shrink();
+
+    final userName = req['user']?.toString() ?? 'Guest';
+    final seatIdx = (req['seatIndex'] as num?)?.toInt() ?? 1;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.goldCoin.withValues(alpha: 0.6), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.4),
+            blurRadius: 6,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.record_voice_over_rounded, color: AppColors.goldCoin, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '🙋 $userName wants Mic Seat ${seatIdx + 1}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const Text(
+                  'Consent required to join live stage',
+                  style: TextStyle(color: Colors.white60, fontSize: 10),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          // Approve Button
+          InkWell(
+            onTap: () => _approveSeatRequest(req),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.gemEmerald,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'Approve',
+                style: TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          // Decline Button
+          InkWell(
+            onTap: () {
+              setState(() => _incomingSeatRequest = null);
+              _sendMessage('❌ Host declined mic seat request');
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.white10,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.close, color: Colors.white70, size: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _approveSeatRequest(Map<String, dynamic> req) {
+    final seatIdx = (req['seatIndex'] as num?)?.toInt() ?? 1;
+    final userName = req['user']?.toString() ?? 'Guest';
+    final userId = req['userId']?.toString() ?? 'guest_${DateTime.now().millisecondsSinceEpoch}';
+    final avatar = req['avatar']?.toString() ?? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
+
+    setState(() {
+      _incomingSeatRequest = null;
+      if (seatIdx >= 0 && seatIdx < _seats.length) {
+        _seats[seatIdx]['userId'] = userId;
+        _seats[seatIdx]['name'] = userName;
+        _seats[seatIdx]['avatar'] = avatar;
+        _seats[seatIdx]['isSpeaking'] = true;
+        _seats[seatIdx]['isMuted'] = false;
+      }
+    });
+
+    _sendMessage('🎉 Host approved $userName onto Mic Seat ${seatIdx + 1}!');
+    _displayGiftBanner('🎙️ $userName is now Live on Mic Seat ${seatIdx + 1}!');
+
+    _roomChannel?.sendBroadcastMessage(
+      event: 'seat_approved',
+      payload: {
+        'seatIndex': seatIdx,
+        'userId': userId,
+        'userName': userName,
+      },
     );
   }
 
@@ -1736,71 +2055,103 @@ class _LiveAudioRoomPageState extends State<LiveAudioRoomPage> with TickerProvid
               ],
             ),
           ),
-          GestureDetector(
-            onTap: () {
-              if (!_isFollowing) {
-                setState(() => _isFollowing = true);
-                _sendMessage('❤️ followed Host ${widget.room.hostName}!');
-                _displayGiftBanner('❤️ You are now following ${widget.room.hostName}!');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Row(
-                      children: [
-                        const Icon(Icons.favorite, color: Colors.pinkAccent, size: 20),
-                        const SizedBox(width: 8),
-                        Text('You followed ${widget.room.hostName}! 💖'),
-                      ],
-                    ),
-                    backgroundColor: AppColors.primaryGreen,
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              } else {
-                setState(() => _isFollowing = false);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('You unfollowed ${widget.room.hostName}.'),
-                    duration: const Duration(seconds: 1),
-                  ),
-                );
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          if (_isHost)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: _isFollowing
-                      ? const [AppColors.gemEmerald, Color(0xFF059669)]
-                      : const [Color(0xFFFF7A00), Color(0xFFFF5252)],
+                gradient: const LinearGradient(
+                  colors: [AppColors.goldCoin, Color(0xFFD97706)],
                 ),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: (_isFollowing ? AppColors.gemEmerald : AppColors.accentOrange).withValues(alpha: 0.4),
+                    color: AppColors.goldCoin.withValues(alpha: 0.4),
                     blurRadius: 6,
                   ),
                 ],
               ),
-              child: Row(
+              child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    _isFollowing ? Icons.check_circle_rounded : Icons.favorite_rounded,
-                    color: Colors.white,
-                    size: 13,
-                  ),
-                  const SizedBox(width: 4),
+                  Icon(Icons.workspace_premium_rounded, color: Colors.black, size: 14),
+                  SizedBox(width: 4),
                   Text(
-                    _isFollowing ? 'Following' : '+ Follow',
-                    style: AppTextStyles.caption.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
+                    '👑 Host',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 11,
                     ),
                   ),
                 ],
               ),
+            )
+          else
+            GestureDetector(
+              onTap: () {
+                if (!_isFollowing) {
+                  setState(() => _isFollowing = true);
+                  _sendMessage('❤️ followed Host ${widget.room.hostName}!');
+                  _displayGiftBanner('❤️ You are now following ${widget.room.hostName}!');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.favorite, color: Colors.pinkAccent, size: 20),
+                          const SizedBox(width: 8),
+                          Text('You followed ${widget.room.hostName}! 💖'),
+                        ],
+                      ),
+                      backgroundColor: AppColors.primaryGreen,
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                } else {
+                  setState(() => _isFollowing = false);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('You unfollowed ${widget.room.hostName}.'),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: _isFollowing
+                        ? const [AppColors.gemEmerald, Color(0xFF059669)]
+                        : const [Color(0xFFFF7A00), Color(0xFFFF5252)],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (_isFollowing ? AppColors.gemEmerald : AppColors.accentOrange).withValues(alpha: 0.4),
+                      blurRadius: 6,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _isFollowing ? Icons.check_circle_rounded : Icons.favorite_rounded,
+                      color: Colors.white,
+                      size: 13,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _isFollowing ? 'Following' : '+ Follow',
+                      style: AppTextStyles.caption.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
           const SizedBox(width: 8),
           IconButton(
             icon: const Icon(Icons.close_rounded, color: Colors.white),
