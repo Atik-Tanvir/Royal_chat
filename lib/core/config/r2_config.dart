@@ -13,8 +13,8 @@ class R2Config {
 
   /// R2 API Token credentials (Access Key ID and Secret Access Key)
   /// Created in Cloudflare Dashboard -> R2 -> Manage R2 API Tokens
-  static const String accessKeyId = 'YOUR_R2_ACCESS_KEY_ID';
-  static const String secretAccessKey = 'YOUR_R2_SECRET_ACCESS_KEY';
+  static const String accessKeyId = '9fe04d2a045f903579a9b9e91165579f';
+  static const String secretAccessKey = '58f2f76726477227468a7a070b812952fb48a7b215d1f717b62100121fb906aa';
 
   /// Whether credentials have been configured
   static bool get isConfigured =>
