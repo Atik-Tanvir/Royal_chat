@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Badge } from '../../shared/components/ui/Badge';
 import { Switch } from '../../shared/components/ui/Switch';
 import {
@@ -19,6 +19,10 @@ import {
   Mail,
   Lock,
   Flame,
+  UploadCloud,
+  ExternalLink,
+  Database,
+  RefreshCw,
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -66,6 +70,105 @@ export default function SettingsPage() {
     apkDownloadUrl: 'https://royalchatlive.com/download/app-release.apk',
     releaseNotes: 'Fixed chat subtab host grid, added 1v1 video calls with beauty filters, and TikTok-style reels.',
   });
+
+  // Cloudflare R2 Storage State
+  const [r2Config, setR2Config] = useState({
+    accountId: 'c6c6c97eea5025ec4aca78fa9e80c60d',
+    bucket: 'royal-chat-live',
+    publicUrl: 'https://pub-24addd4f2203427489399f391ba11669.r2.dev',
+    accessKeyId: '',
+    secretAccessKey: '',
+    isConfigured: false,
+    testStatus: 'untested',
+    testMessage: '',
+  });
+  const [isR2Testing, setIsR2Testing] = useState(false);
+  const [r2SaveMsg, setR2SaveMsg] = useState('');
+  const [testUploadResult, setTestUploadResult] = useState<string | null>(null);
+  const [isUploadingTest, setIsUploadingTest] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/storage/config')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data) {
+          setR2Config((prev) => ({
+            ...prev,
+            accountId: data.accountId || prev.accountId,
+            bucket: data.bucket || prev.bucket,
+            publicUrl: data.publicUrl || prev.publicUrl,
+            accessKeyId: data.accessKeyId || '',
+            secretAccessKey: data.secretAccessKey || '',
+            isConfigured: data.isConfigured || false,
+            testStatus: data.testStatus || 'untested',
+            testMessage: data.testMessage || '',
+          }));
+        }
+      })
+      .catch((err) => console.error('Failed to load R2 config', err));
+  }, []);
+
+  async function handleSaveR2() {
+    setIsR2Testing(true);
+    setR2SaveMsg('');
+    try {
+      const res = await fetch('/api/storage/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: r2Config.accountId,
+          bucket: r2Config.bucket,
+          publicUrl: r2Config.publicUrl,
+          accessKeyId: r2Config.accessKeyId,
+          secretAccessKey: r2Config.secretAccessKey,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setR2SaveMsg('Configuration saved! Running connection test...');
+        const checkRes = await fetch('/api/storage/config');
+        const checkData = await checkRes.json();
+        setR2Config((prev) => ({
+          ...prev,
+          ...checkData,
+        }));
+        setR2SaveMsg('Saved & tested successfully!');
+      } else {
+        setR2SaveMsg(data.error || 'Failed to save');
+      }
+    } catch (e: any) {
+      setR2SaveMsg(e.message || 'Error saving R2 config');
+    } finally {
+      setIsR2Testing(false);
+      setTimeout(() => setR2SaveMsg(''), 4000);
+    }
+  }
+
+  async function handleTestUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingTest(true);
+    setTestUploadResult(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('folder', 'admin_tests');
+      const res = await fetch('/api/storage/upload', {
+        method: 'POST',
+        body: fd,
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setTestUploadResult(`Success! File uploaded to Cloudflare R2: ${data.url}`);
+      } else {
+        setTestUploadResult(`Error: ${data.error || 'Upload failed'}`);
+      }
+    } catch (err: any) {
+      setTestUploadResult(`Error: ${err.message}`);
+    } finally {
+      setIsUploadingTest(false);
+    }
+  }
 
   function handleSaveSettings(e: React.FormEvent) {
     e.preventDefault();
@@ -118,12 +221,173 @@ export default function SettingsPage() {
 
         <div className="p-5 rounded-2xl glass-panel border border-[#1C3830]">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-400 uppercase">Cloudflare R2 Media Storage</span>
-            <Badge variant="emerald">Connected</Badge>
+            <span className="text-xs font-bold text-slate-400 uppercase">Cloudflare R2 Storage</span>
+            <Badge variant={r2Config.testStatus === 'connected' ? 'emerald' : r2Config.isConfigured ? 'amber' : 'rose'}>
+              {r2Config.testStatus === 'connected' ? 'Connected' : r2Config.isConfigured ? 'Configured' : 'Needs Token'}
+            </Badge>
           </div>
-          <p className="text-sm font-bold text-white font-mono truncate">royal-chat-live</p>
-          <p className="text-[11px] text-slate-400 mt-1">Reels & Moments CDN Active</p>
+          <p className="text-sm font-bold text-white font-mono truncate">{r2Config.bucket}</p>
+          <p className="text-[11px] text-slate-400 mt-1">
+            {r2Config.testStatus === 'connected' ? 'Verified & Active' : 'S3 Object CDN Storage'}
+          </p>
         </div>
+      </div>
+
+      {/* SECTION: Cloudflare R2 Object Storage Deployment & Configuration */}
+      <div className="rounded-2xl glass-panel p-6 border border-[#1C3830] space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <Cloud className="w-5 h-5 text-emerald-400" />
+              <span>Cloudflare R2 Media & Asset Storage (royal-chat-live)</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">
+              High-speed S3-compatible cloud object storage for avatar photos, banners, moments feed, and chat media.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <a
+              href="https://dash.cloudflare.com/c6c6c97eea5025ec4aca78fa9e80c60d/r2/default/buckets/royal-chat-live"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-semibold text-slate-300 border border-white/10 transition-colors"
+            >
+              <span>Open in Cloudflare</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+            <button
+              type="button"
+              onClick={handleSaveR2}
+              disabled={isR2Testing}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50"
+            >
+              {isR2Testing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span>{isR2Testing ? 'Testing Connection...' : 'Save & Verify'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Status Alert Banner */}
+        {r2Config.testStatus === 'connected' ? (
+          <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3 text-emerald-400 text-xs font-medium">
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+            <span>{r2Config.testMessage || "Successfully connected to Cloudflare R2 bucket 'royal-chat-live'!"}</span>
+          </div>
+        ) : r2Config.testStatus === 'error' ? (
+          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center gap-3 text-rose-400 text-xs font-medium">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>{r2Config.testMessage}</span>
+          </div>
+        ) : !r2Config.isConfigured ? (
+          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-3 text-amber-300 text-xs font-medium">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>Cloudflare R2 Bucket & Endpoint configured. Enter R2 API Token credentials below to enable live uploads.</span>
+          </div>
+        ) : null}
+
+        {r2SaveMsg && (
+          <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-300 text-xs font-medium">
+            {r2SaveMsg}
+          </div>
+        )}
+
+        {/* Inputs */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1">Cloudflare Account ID</label>
+            <input
+              type="text"
+              value={r2Config.accountId}
+              onChange={(e) => setR2Config({ ...r2Config, accountId: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-[#1C3830] text-sm text-white font-mono focus:outline-none focus:border-emerald-500"
+              placeholder="c6c6c97eea5025ec4aca78fa9e80c60d"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1">R2 Bucket Name</label>
+            <input
+              type="text"
+              value={r2Config.bucket}
+              onChange={(e) => setR2Config({ ...r2Config, bucket: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-[#1C3830] text-sm text-white font-mono focus:outline-none focus:border-emerald-500"
+              placeholder="royal-chat-live"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1">R2 S3 API Endpoint</label>
+            <input
+              type="text"
+              readOnly
+              value={`https://${r2Config.accountId}.r2.cloudflarestorage.com`}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-black/20 border border-[#1C3830] text-sm text-slate-400 font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1">Public CDN Domain (R2.dev or Custom)</label>
+            <input
+              type="text"
+              value={r2Config.publicUrl}
+              onChange={(e) => setR2Config({ ...r2Config, publicUrl: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-[#1C3830] text-sm text-white font-mono focus:outline-none focus:border-emerald-500"
+              placeholder="https://pub-24addd4f2203427489399f391ba11669.r2.dev"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1">R2 Access Key ID</label>
+            <input
+              type="text"
+              value={r2Config.accessKeyId}
+              onChange={(e) => setR2Config({ ...r2Config, accessKeyId: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-[#1C3830] text-sm text-white font-mono focus:outline-none focus:border-emerald-500"
+              placeholder="Paste R2 Access Key ID from Cloudflare"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1">R2 Secret Access Key</label>
+            <input
+              type="password"
+              value={r2Config.secretAccessKey}
+              onChange={(e) => setR2Config({ ...r2Config, secretAccessKey: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-black/40 border border-[#1C3830] text-sm text-white font-mono focus:outline-none focus:border-emerald-500"
+              placeholder="Paste R2 Secret Access Key from Cloudflare"
+            />
+          </div>
+        </div>
+
+        {/* Live Test Upload Box */}
+        <div className="p-4 rounded-xl bg-black/30 border border-[#1C3830] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold text-white flex items-center gap-2">
+              <UploadCloud className="w-4 h-4 text-emerald-400" />
+              <span>Test Live Upload to Cloudflare R2</span>
+            </p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Select any test image/file to verify direct upload and CDN link generation.
+            </p>
+          </div>
+          <div>
+            <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold cursor-pointer transition-colors">
+              <UploadCloud className="w-4 h-4" />
+              <span>{isUploadingTest ? 'Uploading to R2...' : 'Upload Test File'}</span>
+              <input
+                type="file"
+                className="hidden"
+                disabled={isUploadingTest}
+                onChange={handleTestUpload}
+              />
+            </label>
+          </div>
+        </div>
+        {testUploadResult && (
+          <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs font-mono text-emerald-300 break-all">
+            {testUploadResult}
+          </div>
+        )}
       </div>
 
       {/* SECTION 1: Login Systems & Authentication Configuration */}
